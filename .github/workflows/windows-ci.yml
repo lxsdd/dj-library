@@ -157,7 +157,7 @@ jobs:
             'MusicBrainz field completeness: release identity + Track Artist/Title/Genre provenance',
             'Discogs release/track field completeness',
             'named window geometry: Normal + Maximized close-state round-trip',
-            'metadata review UX v2: safe starting values',
+            'metadata review UX v3: safe starting values',
             'PASS: UI production path:',
             'PASS: UI contract:',
             'counts=1119/1315/15440',
