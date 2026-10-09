@@ -31,7 +31,22 @@ namespace DJLibrary
         {
             LoadTracks(Path.Combine(dataDirectory, "tracks.tsv.gz"));
             LoadCds(Path.Combine(dataDirectory, "cds.tsv.gz"));
+            BindTracksToPhysicalDiscs();
             LoadMatches(Path.Combine(dataDirectory, "matches.tsv.gz"));
+        }
+
+        // One read-only association per import; no duplicate compatibility data
+        // is stored in SQLite or physical MP3 tags.
+        private void BindTracksToPhysicalDiscs()
+        {
+            Dictionary<int, CdRow> discs = new Dictionary<int, CdRow>();
+            foreach (CdRow cd in Cds) discs[cd.DiscId] = cd;
+            foreach (TrackRow track in Tracks)
+            {
+                CdRow disc;
+                track.DiscToc = discs.TryGetValue(track.DiscId, out disc) ? disc.Toc : "";
+                track.DiscTocComplete = disc != null && disc.TocComplete;
+            }
         }
 
         public void SetDigitalSourceDescription(string description)
