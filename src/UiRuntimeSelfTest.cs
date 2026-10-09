@@ -28,7 +28,7 @@ namespace DJLibrary
 
             CdDetailWindow cdDetail = new CdDetailWindow(null, alex, data);
             if (cdDetail.Icon == null) throw new InvalidOperationException("UI-Produktionspfad: CD-Detailfenster besitzt kein explizites Icon.");
-            if (!ContainsTextBlock(cdDetail, "CDX Compatible") || !ContainsTextBox(cdDetail, "No"))
+            if (!ContainsTextBlock(cdDetail, "Disc playable") || !ContainsTextBox(cdDetail, "No"))
                 throw new InvalidOperationException("UI-Produktionspfad: CD-Details enthalten kein sichtbares CDX Compatible=Nein-Feld.");
 
             // Inspect the exact private DataGrid field constructed by MainWindow. Reflection is
@@ -42,10 +42,17 @@ namespace DJLibrary
             if (!GridRuntimeSupport.HasDeterministicCdxRowStyle(productionCdxGrid))
                 throw new InvalidOperationException("UI-Produktionspfad: reales _cdGrid besitzt keinen deterministischen CDX-RowStyle.");
 
+            TrackRow noTrack = data.Tracks.FirstOrDefault(t => t.DiscId == alex.DiscId);
+            if (noTrack == null || noTrack.CdxCompatibilityState != CdxCompatibilityState.Incompatible ||
+                !String.Equals(noTrack.DiscToc, alex.Toc, StringComparison.Ordinal))
+                throw new InvalidOperationException("UI production path: physical CDX warning must also be available for every track of that disc.");
+
             TrackRow sampleTrack = data.Tracks.FirstOrDefault();
             if (sampleTrack == null) throw new InvalidOperationException("UI-Produktionspfad: kein Track für Detailtest present.");
             TrackDetailWindow trackDetail = new TrackDetailWindow(null, sampleTrack, data);
             if (trackDetail.Icon == null) throw new InvalidOperationException("UI-Produktionspfad: Track-Detailfenster besitzt kein explizites Icon.");
+            if (!ContainsTextBlock(trackDetail, "Disc playable"))
+                throw new InvalidOperationException("UI production path: track details do not expose parent CD playability.");
             DataGrid matchGrid = FindDataGrids(trackDetail).FirstOrDefault(delegate(DataGrid g)
             {
                 return g.Columns.Any(delegate(DataGridColumn c) { return c.SortMemberPath == "MethodText"; });
