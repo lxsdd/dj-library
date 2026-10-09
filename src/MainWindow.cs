@@ -58,6 +58,7 @@ namespace DJLibrary
         {
             _data = data;
             _settings = SettingsManager.Load();
+            DiscPlaybackRule.Configure(_settings.DiscPlayback);
             _lastMainMaximized = _settings.Maximized;
             _bridgeDirectoryPinned = !String.IsNullOrWhiteSpace(_settings.BridgeDirectory);
             _bridgeDirectory = ResolveInitialBridgeDirectory(_settings.BridgeDirectory);
@@ -201,8 +202,8 @@ namespace DJLibrary
             filter.Children.Add(_mediumPanel);
 
             _cdxPanel = InlinePanel();
-            _cdxPanel.Children.Add(FilterLabel("CDX Compatible:", "Filters physical discs using the complete TOC. Limit: 79:59:74."));
-            _cdxCombo = Combo(115, "Numark CDX compatibility: Yes, No, or Unknown.");
+            _cdxPanel.Children.Add(FilterLabel("Disc playable:", "Filters CDs and their tracks according to the configured physical-disc playback limit."));
+            _cdxCombo = Combo(115, "Compatibility of the containing physical disc: Yes, No, or Unknown.");
             _cdxPanel.Children.Add(_cdxCombo);
             filter.Children.Add(_cdxPanel);
 
@@ -243,12 +244,19 @@ namespace DJLibrary
             AddColumns(_cdGrid, _cdColumns);
             _cdGrid.AlternatingRowBackground = null;
             _cdGrid.RowStyle = GridRuntimeSupport.CreateCdxRowStyle();
+            _trackGrid.AlternatingRowBackground = null;
+            _trackGrid.RowStyle = GridRuntimeSupport.CreateCdxRowStyle();
             bool cdxLayoutKnown = _settings.CdColumns != null && _settings.CdColumns.Any(delegate(ColumnSetting s)
             {
                 return String.Equals(s.Key, "CdxCompatibilitySortKey", StringComparison.OrdinalIgnoreCase);
             });
             SettingsManager.ApplyColumns(_trackGrid, _settings.TrackColumns);
             SettingsManager.ApplyColumns(_cdGrid, _settings.CdColumns);
+            if (!DiscPlaybackRule.Current.Enabled)
+            {
+                _trackGrid.Columns.First(x => x.SortMemberPath == "CdxCompatibilitySortKey").Visibility = Visibility.Collapsed;
+                _cdGrid.Columns.First(x => x.SortMemberPath == "CdxCompatibilitySortKey").Visibility = Visibility.Collapsed;
+            }
             if (!cdxLayoutKnown) PlaceColumnAfter(_cdGrid, "CdxCompatibilitySortKey", "DurationSeconds");
             AttachColumnContextMenus(_trackGrid);
             AttachColumnContextMenus(_cdGrid);
@@ -377,6 +385,11 @@ namespace DJLibrary
             discogs.ToolTip = "Configure the personal Discogs API token for independent CD searches. The token is encrypted for the current Windows user with DPAPI.";
             discogs.Click += delegate { DiscogsSettingsDialog.Show(this); };
             extras.Items.Add(discogs);
+            extras.Items.Add(new Separator());
+            MenuItem playback = new MenuItem { Header = "_Disc Playback Rule…" };
+            playback.ToolTip = "Configure physical CD playability, MM:SS:FF limit and optional CD/track highlighting.";
+            playback.Click += delegate { new DiscPlaybackRuleWindow(this, RefreshPlaybackRuleViews).ShowDialog(); };
+            extras.Items.Add(playback);
             extras.Items.Add(new Separator());
             MenuItem genres = new MenuItem { Header = "_Genre Matching Status…" };
             genres.ToolTip = "Show how many historical genres were safely updated from the digital foobar collection.";
@@ -913,6 +926,7 @@ namespace DJLibrary
             x.Add(new ColumnSpec("TrackNumber", "#", "Track number on the disc.", "TrackNumber", 48, true));
             x.Add(new ColumnSpec("DiscNumber", "Disc", "Disc number within a multi-disc set.", "DiscText", 58, true));
             x.Add(new ColumnSpec("DurationSeconds", "Duration", "Track duration.", "DurationText", 78, true));
+            x.Add(new ColumnSpec("CdxCompatibilitySortKey", "Disc playable", "Compatibility of the physical CD containing this track (configurable under Tools → Disc Playback Rule).", "CdxCompatibilityText", 112, true));
             x.Add(new ColumnSpec("Date", "Year", "Release year / DATE.", "Date", 68, true));
             x.Add(new ColumnSpec("Genre", "Genre", "Preferred genre: use foobar GENRE for a strong digital match; otherwise keep the historical collection genre.", "Genre", 150, true));
             x.Add(new ColumnSpec("GenreSourceText", "Genre-Source", "Shows whether the displayed genre comes from a strong digital match or the legacy database.", "GenreSourceText", 190, false));
@@ -932,7 +946,7 @@ namespace DJLibrary
             x.Add(new ColumnSpec("DiscNumber", "Disc", "Disc Number innerhalb eines Mehrfachsets.", "DiscText", 62, true));
             x.Add(new ColumnSpec("Tracks", "Tracks", "Number of logically cataloged tracks.", "Tracks", 65, true));
             x.Add(new ColumnSpec("DurationSeconds", "Total Duration", "Physical CD duration, primarily derived from TOC and lead-out.", "DurationText", 90, true));
-            x.Add(new ColumnSpec("CdxCompatibilitySortKey", "CDX Compatible", "Numark CDX compatibility based on the complete physical TOC. Limit: 79:59:74.", "CdxCompatibilityText", 118, true));
+            x.Add(new ColumnSpec("CdxCompatibilitySortKey", "Disc playable", "Configurable physical CD playback rule; 75 frames/second, derived from complete TOC.", "CdxCompatibilityText", 118, true));
             x.Add(new ColumnSpec("Date", "Year", "Release year / DATE.", "Date", 68, true));
             x.Add(new ColumnSpec("Genre", "Genre", "Preferred CD genre. Updated only when strongly matched digital track genres reach a strong consensus.", "Genre", 160, true));
             x.Add(new ColumnSpec("GenreSourceText", "Genre-Source", "Shows whether the CD genre comes from digital track consensus or the legacy database.", "GenreSourceText", 175, false));
