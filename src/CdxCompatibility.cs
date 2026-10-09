@@ -219,6 +219,20 @@ namespace DJLibrary
                     Classify("150 360150", true) != CdxCompatibilityState.Incompatible ||
                     Classify("150 360151", true) != CdxCompatibilityState.Incompatible)
                     throw new InvalidOperationException("Strictly-greater-than custom threshold failed.");
+                opt.MarkTracks = false;
+                opt.MarkCds = true;
+                opt.WarningColor = "Orange";
+                Configure(opt);
+                if (Code(CdxCompatibilityState.Incompatible, true) != "" ||
+                    Code(CdxCompatibilityState.Incompatible, false) != "no" ||
+                    Current.WarningColor != "Orange")
+                    throw new InvalidOperationException("CD and track marking preferences are not independent.");
+                opt.MarkTracks = true;
+                opt.MarkCds = false;
+                Configure(opt);
+                if (Code(CdxCompatibilityState.Incompatible, true) != "no" ||
+                    Code(CdxCompatibilityState.Incompatible, false) != "")
+                    throw new InvalidOperationException("CD row marking cannot be disabled independently.");
                 opt.Enabled = false;
                 Configure(opt);
                 if (Text(Classify("150 360151", true)) != "" ||
