@@ -22,8 +22,7 @@ namespace DJLibrary
         private readonly TextBox _searchBox;
         private readonly StackPanel _searchActions;
         private readonly Button _resetFiltersButton;
-        private readonly ScrollViewer _filterScroll;
-        private readonly StackPanel _filterOptions;
+        private readonly WrapPanel _filterOptions;
         private readonly ComboBox _genreCombo;
         private readonly ComboBox _digitalCombo;
         private readonly ComboBox _yearCombo;
@@ -142,9 +141,9 @@ namespace DJLibrary
             DockPanel.SetDock(filterBorder, Dock.Top);
             root.Children.Add(filterBorder);
 
-            // Search + Reset stay together at the left. All secondary filter
-            // groups have a single stable baseline: overflow scrolls horizontally
-            // instead of wrapping into a second line at ordinary desktop widths.
+            // Search + Reset stay permanently together at the left.
+            // Secondary groups are compact and wrap only when the actual
+            // window width is insufficient; never show a filter scrollbar.
             Grid filterLayout = new Grid();
             filterLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             filterLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -154,25 +153,18 @@ namespace DJLibrary
             Grid.SetColumn(_searchActions, 0);
             filterLayout.Children.Add(_searchActions);
 
-            _filterOptions = new StackPanel {
+            _filterOptions = new WrapPanel {
                 Orientation = Orientation.Horizontal,
                 VerticalAlignment = VerticalAlignment.Center
             };
-            _filterScroll = new ScrollViewer {
-                Content = _filterOptions,
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-                VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                CanContentScroll = false,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            Grid.SetColumn(_filterScroll, 1);
-            filterLayout.Children.Add(_filterScroll);
-            StackPanel filter = _filterOptions;
+            Grid.SetColumn(_filterOptions, 1);
+            filterLayout.Children.Add(_filterOptions);
+            WrapPanel filter = _filterOptions;
 
             StackPanel searchPanel = _searchActions;
             searchPanel.Children.Add(FilterLabel("Search:", "Searches Artist, Title, Mix/Version, Album, Genre, Label, Catalog Number, and other core fields."));
             _searchBox = new TextBox();
-            _searchBox.Width = 270;
+            _searchBox.Width = 210;
             _searchBox.Height = 26;
             _searchBox.VerticalContentAlignment = VerticalAlignment.Center;
             _searchBox.Margin = new Thickness(4, 0, 6, 0);
@@ -188,49 +180,49 @@ namespace DJLibrary
 
             StackPanel genrePanel = InlinePanel();
             genrePanel.Children.Add(FilterLabel("Genre:", "Filters by preferred genre. A strong digital match uses the current foobar GENRE; otherwise the historical collection genre is retained."));
-            _genreCombo = Combo(145, "Genre filter for the current view.");
+            _genreCombo = Combo(120, "Genre filter for the current view.");
             genrePanel.Children.Add(_genreCombo);
             filter.Children.Add(genrePanel);
 
             StackPanel digitalPanel = InlinePanel();
             digitalPanel.Children.Add(FilterLabel("Digital:", "Filters by automatic digital-match quality."));
-            _digitalCombo = Combo(135, "Final digital status is calculated automatically from the foobar Bridge index.");
+            _digitalCombo = Combo(105, "Final digital status is calculated automatically from the foobar Bridge index.");
             digitalPanel.Children.Add(_digitalCombo);
             filter.Children.Add(digitalPanel);
 
             StackPanel yearPanel = InlinePanel();
             yearPanel.Children.Add(FilterLabel("Year:", "Filters by release year."));
-            _yearCombo = Combo(80, "Year filter.");
+            _yearCombo = Combo(70, "Year filter.");
             yearPanel.Children.Add(_yearCombo);
             filter.Children.Add(yearPanel);
 
             StackPanel labelPanel = InlinePanel();
             labelPanel.Children.Add(FilterLabel("Label:", "Filters the current view by label."));
-            _labelCombo = Combo(135, "Label filter for tracks and CDs.");
+            _labelCombo = Combo(105, "Label filter for tracks and CDs.");
             labelPanel.Children.Add(_labelCombo);
             filter.Children.Add(labelPanel);
 
             StackPanel issuePanel = InlinePanel();
             issuePanel.Children.Add(FilterLabel("Check:", "Filters by documented legacy issues."));
-            _issueCombo = Combo(115, "Shows all, only records with issues, or only records without issues.");
+            _issueCombo = Combo(95, "Shows all, only records with issues, or only records without issues.");
             issuePanel.Children.Add(_issueCombo);
             filter.Children.Add(issuePanel);
 
             _mediumPanel = InlinePanel();
             _mediumPanel.Children.Add(FilterLabel("Medium:", "Filters CDs by medium type."));
-            _mediumCombo = Combo(110, "Medium type of the physical release.");
+            _mediumCombo = Combo(95, "Medium type of the physical release.");
             _mediumPanel.Children.Add(_mediumCombo);
             filter.Children.Add(_mediumPanel);
 
             _cdxPanel = InlinePanel();
             _cdxPanel.Children.Add(FilterLabel("Disc playable:", "Filters CDs and their tracks according to the configured physical-disc playback limit."));
-            _cdxCombo = Combo(115, "Compatibility of the containing physical disc: Yes, No, or Unknown.");
+            _cdxCombo = Combo(95, "Compatibility of the containing physical disc: Yes, No, or Unknown.");
             _cdxPanel.Children.Add(_cdxCombo);
             filter.Children.Add(_cdxPanel);
 
             _mixPanel = InlinePanel();
             _mixPanel.Children.Add(FilterLabel("Mix:", "Filters tracks by whether a separate Mix/Version value is present."));
-            _mixCombo = Combo(105, "Mix/Version filter.");
+            _mixCombo = Combo(90, "Mix/Version filter.");
             _mixPanel.Children.Add(_mixCombo);
             filter.Children.Add(_mixPanel);
 
@@ -1435,7 +1427,7 @@ namespace DJLibrary
 
         private void ValidateFilterToolbarLayoutContract()
         {
-            if (_searchActions == null || _filterScroll == null ||
+            if (_searchActions == null ||
                 _filterOptions == null || _resetFiltersButton == null ||
                 _searchActions.Orientation != Orientation.Horizontal ||
                 _filterOptions.Orientation != Orientation.Horizontal ||
@@ -1443,19 +1435,20 @@ namespace DJLibrary
                     _searchActions.Children.IndexOf(_searchBox) + 1)
                 throw new InvalidOperationException("Filter toolbar: Reset Filters is not directly next to Search.");
 
-            Grid layout = _filterScroll.Parent as Grid;
-            if (layout == null || !Object.ReferenceEquals(_filterScroll.Content, _filterOptions) ||
+            Grid layout = _filterOptions.Parent as Grid;
+            if (layout == null ||
                 !Object.ReferenceEquals(_searchActions.Parent, layout) ||
-                Grid.GetColumn(_searchActions) != 0 || Grid.GetColumn(_filterScroll) != 1 ||
+                Grid.GetColumn(_searchActions) != 0 || Grid.GetColumn(_filterOptions) != 1 ||
                 layout.ColumnDefinitions.Count != 2 ||
                 layout.ColumnDefinitions[0].Width.GridUnitType != GridUnitType.Auto ||
                 layout.ColumnDefinitions[1].Width.GridUnitType != GridUnitType.Star ||
-                _filterScroll.HorizontalScrollBarVisibility != ScrollBarVisibility.Auto ||
-                _filterScroll.VerticalScrollBarVisibility != ScrollBarVisibility.Disabled ||
-                _filterOptions.Children.OfType<WrapPanel>().Any() ||
+                _filterOptions.Orientation != Orientation.Horizontal ||
+                _searchBox.Width > 225 ||
+                _genreCombo.Width > 125 || _digitalCombo.Width > 110 ||
+                _labelCombo.Width > 110 || _cdxCombo.Width > 100 ||
                 !_filterOptions.Children.Contains(_cdxPanel) ||
                 !_filterOptions.Children.Contains(_mixPanel))
-                throw new InvalidOperationException("Filter toolbar: secondary filters must remain one horizontal, scrollable row.");
+                throw new InvalidOperationException("Filter toolbar: compact filters must wrap as groups only when width is insufficient, without a scrollbar.");
         }
 
         internal string ValidateRuntimeUiContract()
