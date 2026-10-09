@@ -379,9 +379,7 @@ namespace DJLibrary
             if (!GridRuntimeSupport.HasDeterministicCdxRowStyle(grid)) throw new InvalidOperationException("UI-Produktionspfad: Catalog-Disc-Grid besitzt keine deterministische CDX-Zeilenmarkierung gegen AlternatingRowBackground.");
             if (!GridRuntimeSupport.HasClipboardMenu(grid)) throw new InvalidOperationException("UI production path: Catalog disc grid has no clipboard menu.");
             DataGrid tracks = CreateGrid();
-            tracks.Columns.Add(GridRuntimeSupport.CreateCdxColumn(new ColumnSpec("CdxCompatibilitySortKey", "Disc playable",
-                "Inherits the parent physical CD's TOC.", "CdxCompatibilityText", 112, true)));
-            tracks.RowStyle = GridRuntimeSupport.CreateCdxRowStyle();
+            ConfigureTrackColumns(tracks);
             if (!GridRuntimeSupport.HasCdxColumn(tracks) || !GridRuntimeSupport.HasDeterministicCdxRowStyle(tracks))
                 throw new InvalidOperationException("UI production path: catalog tracks lack playback-status column or row marker.");
             return "Catalog: physical CD/track playability column + marker + Clipboard";
@@ -389,17 +387,22 @@ namespace DJLibrary
 
         private void ConfigureTrackColumns()
         {
-            AddTextColumn(_trackGrid, "#", "Position", 45);
-            AddTextColumn(_trackGrid, "Artist", "Artist", 140);
-            AddTextColumn(_trackGrid, "Title", "Title", 170);
-            AddTextColumn(_trackGrid, "Mix/Version", "Version", 120);
-            AddTextColumn(_trackGrid, "Genre", "Genre", 100);
-            AddTextColumn(_trackGrid, "BPM", "Bpm", 65);
-            AddTextColumn(_trackGrid, "Duration", "DurationText", "DurationSeconds", 86);
-            _trackGrid.Columns.Add(GridRuntimeSupport.CreateCdxColumn(new ColumnSpec("CdxCompatibilitySortKey", "Disc playable",
+            ConfigureTrackColumns(_trackGrid);
+        }
+
+        private static void ConfigureTrackColumns(DataGrid grid)
+        {
+            AddTextColumn(grid, "#", "Position", 45);
+            AddTextColumn(grid, "Artist", "Artist", 140);
+            AddTextColumn(grid, "Title", "Title", 170);
+            AddTextColumn(grid, "Mix/Version", "Version", 120);
+            AddTextColumn(grid, "Genre", "Genre", 100);
+            AddTextColumn(grid, "BPM", "Bpm", 65);
+            AddTextColumn(grid, "Duration", "DurationText", "DurationSeconds", 86);
+            grid.Columns.Add(GridRuntimeSupport.CreateCdxColumn(new ColumnSpec("CdxCompatibilitySortKey", "Disc playable",
                 "Compatibility of this track's containing physical CD.", "CdxCompatibilityText", 112, DiscPlaybackRule.Current.Enabled)));
-            _trackGrid.AlternatingRowBackground = null;
-            _trackGrid.RowStyle = GridRuntimeSupport.CreateCdxRowStyle();
+            grid.AlternatingRowBackground = null;
+            grid.RowStyle = GridRuntimeSupport.CreateCdxRowStyle();
         }
 
         private static void AddTextColumn(DataGrid grid, string header, string path, double width)
