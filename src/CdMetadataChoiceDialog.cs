@@ -80,7 +80,7 @@ namespace DJLibrary
             _useBaseButton = new Button { Content="Use Starting Values",MinWidth=135,Margin=new Thickness(7,0,0,0),Padding=new Thickness(8,3,8,3),ToolTip="Rebuild release/track metadata from the selected starting strategy and reset existing field changes. Physical TOC, track order and durations are preserved." };
             DockPanel.SetDock(_useBaseButton,Dock.Right); basePanel.Children.Add(_useBaseButton);
             IList<CdMetadataBaseSetChoice> baseChoices = _session.BaseSetChoices;
-            _baseSourceCombo = new ComboBox { MinWidth=430,ItemsSource=baseChoices,DisplayMemberPath="DisplayText",SelectedItem=baseChoices.FirstOrDefault(x => x != null && String.Equals(x.Source,_session.BaseSource,StringComparison.OrdinalIgnoreCase)),ToolTip="Select starting values. Choosing an item does not change metadata until Use Starting Values is pressed." };
+            _baseSourceCombo = new ComboBox { MinWidth=430,Height=27,VerticalAlignment=VerticalAlignment.Center,VerticalContentAlignment=VerticalAlignment.Center,ItemsSource=baseChoices,DisplayMemberPath="DisplayText",SelectedItem=baseChoices.FirstOrDefault(x => x != null && String.Equals(x.Source,_session.BaseSource,StringComparison.OrdinalIgnoreCase)),ToolTip="Select starting values. Choosing an item does not change metadata until Use Starting Values is pressed." };
             basePanel.Children.Add(_baseSourceCombo);
             sourceArea.Children.Add(basePanel);
             _baseDetail = new TextBlock { Margin=new Thickness(0,3,0,0),TextWrapping=TextWrapping.Wrap,ToolTip="Summarizes the currently effective metadata result and remaining review items." };
@@ -107,13 +107,13 @@ namespace DJLibrary
             _fieldLabel=new TextBlock { Text="Select a field",VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,10,0) };
             Grid.SetColumn(_fieldLabel,0); chooserGrid.Children.Add(_fieldLabel);
             StackPanel choiceStack=new StackPanel();
-            _fieldChoices=new ComboBox { MinWidth=500,Height=27,DisplayMemberPath="DisplayText",ToolTip="Compare the current result with returned alternatives. Merely selecting an item does not change metadata." };
+            _fieldChoices=new ComboBox { MinWidth=500,Height=27,VerticalAlignment=VerticalAlignment.Center,VerticalContentAlignment=VerticalAlignment.Center,DisplayMemberPath="DisplayText",ToolTip="Compare the current result with returned alternatives. Merely selecting an item does not change metadata." };
             _fieldChoices.SelectionChanged+=FieldChoiceChanged;
             _fieldDetail=new TextBlock { Text="",TextWrapping=TextWrapping.Wrap,Margin=new Thickness(2,3,0,0) };
             _bulkResult=new TextBlock { Text="",TextWrapping=TextWrapping.Wrap,Margin=new Thickness(2,3,0,0) };
             choiceStack.Children.Add(_fieldChoices); choiceStack.Children.Add(_fieldDetail); choiceStack.Children.Add(_bulkResult);
             Grid.SetColumn(choiceStack,1); chooserGrid.Children.Add(choiceStack);
-            StackPanel fieldActions=new StackPanel { Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Top,Margin=new Thickness(8,0,0,0) };
+            StackPanel fieldActions=new StackPanel { Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(8,0,0,0) };
             _useFieldButton=new Button { Content="Use Selected Value",MinWidth=130,Margin=new Thickness(0,0,6,0),Padding=new Thickness(8,3,8,3),IsEnabled=false,ToolTip="Apply the selected candidate to this field only. Selecting a candidate in the list is only a preview." };
             ToolTipService.SetShowOnDisabled(_useFieldButton,true);
             _useFieldButton.Click+=delegate { ApplySelectedFieldValue(); };
