@@ -98,7 +98,7 @@ namespace DJLibrary
 
         private static CheckBox AddCheck(Grid g,int row,bool value,string tip)
         {
-            CheckBox b=new CheckBox { IsChecked=value,Margin=new Thickness(0,6,0,6),VerticalAlignment=VerticalAlignment.Center,ToolTip=tip };
+            CheckBox b=new CheckBox { IsChecked=value,Margin=new Thickness(0,4,0,4),VerticalAlignment=VerticalAlignment.Center,VerticalContentAlignment=VerticalAlignment.Center,ToolTip=tip };
             Grid.SetRow(b,row); Grid.SetColumn(b,1); g.Children.Add(b); return b;
         }
 
