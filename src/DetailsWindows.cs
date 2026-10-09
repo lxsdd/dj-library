@@ -59,6 +59,8 @@ namespace DJLibrary
             UiHelpers.AddField(info, 6, 0, "Genre-Source", track.GenreSourceText, "Shows whether the displayed genre comes from the legacy Music Library database or a strong digital track match.");
             if (track.GenreProjected && !String.Equals(track.LegacyGenre, track.Genre, StringComparison.OrdinalIgnoreCase))
                 UiHelpers.AddField(info, 6, 1, "Legacy Genre", track.LegacyGenre, "Unmodified historical Music Library genre, preserved for traceability.");
+            if (DiscPlaybackRule.Current.Enabled)
+                UiHelpers.AddField(info, 7, 0, "Disc playable", track.CdxCompatibilityText, track.CdxCompatibilityToolTip);
 
             GroupBox digitalGroup = new GroupBox();
             digitalGroup.Header = "Digital / Matching";
@@ -272,7 +274,8 @@ namespace DJLibrary
             UiHelpers.AddField(disc, 1, 0, "Total Duration", cd.DurationText, "Physical CD duration, primarily derived from TOC and lead-out.");
             UiHelpers.AddField(disc, 1, 1, "Medium", cd.Medium, "Physischer Medientyp.");
             UiHelpers.AddField(disc, 2, 0, "Digital", cd.DigitalText, "Number of strongly matched tracks relative to the CD track count, based on the currently active digital collection.");
-            UiHelpers.AddField(disc, 2, 1, "CDX Compatible", cd.CdxCompatibilityText, cd.CdxCompatibilityToolTip);
+            if (DiscPlaybackRule.Current.Enabled)
+                UiHelpers.AddField(disc, 2, 1, "Disc playable", cd.CdxCompatibilityText, cd.CdxCompatibilityToolTip);
             UiHelpers.AddField(disc, 3, 0, "Stark", cd.StrongTracks.ToString(), "Tracks mit starkem Digitalmatch.");
             UiHelpers.AddField(disc, 3, 1, "Wahrscheinlich", cd.LikelyTracks.ToString(), "Tracks mit wahrscheinlichem Digitalmatch.");
             UiHelpers.AddField(disc, 4, 0, "Kandidat", cd.CandidateTracks.ToString(), "Tracks mit einfachem Digitalkandidaten.");
