@@ -250,7 +250,7 @@ namespace DJLibrary
             t.FontWeight = FontWeights.SemiBold;
             t.TextWrapping = TextWrapping.Wrap;
             t.Margin = new Thickness(0, 4, 10, 4);
-            t.VerticalAlignment = VerticalAlignment.Top;
+            t.VerticalAlignment = VerticalAlignment.Center;
             if (!String.IsNullOrEmpty(toolTip)) t.ToolTip = toolTip;
             return t;
         }
@@ -261,7 +261,7 @@ namespace DJLibrary
             t.Text = String.IsNullOrEmpty(text) ? "—" : text;
             t.TextWrapping = TextWrapping.Wrap;
             t.Margin = new Thickness(0, 4, 18, 4);
-            t.VerticalAlignment = VerticalAlignment.Top;
+            t.VerticalAlignment = VerticalAlignment.Center;
             if (!String.IsNullOrEmpty(toolTip)) t.ToolTip = toolTip;
             return t;
         }
@@ -276,7 +276,7 @@ namespace DJLibrary
             t.Padding = new Thickness(0);
             t.TextWrapping = TextWrapping.Wrap;
             t.Margin = new Thickness(0, 4, 18, 4);
-            t.VerticalAlignment = VerticalAlignment.Top;
+            t.VerticalAlignment = VerticalAlignment.Center;
             t.Cursor = Cursors.IBeam;
             if (!String.IsNullOrEmpty(toolTip)) t.ToolTip = toolTip;
             return t;
@@ -315,7 +315,8 @@ namespace DJLibrary
             v.IsChecked = value;
             v.IsHitTestVisible = false;
             v.Focusable = false;
-            v.VerticalAlignment = VerticalAlignment.Top;
+            v.VerticalAlignment = VerticalAlignment.Center;
+            v.VerticalContentAlignment = VerticalAlignment.Center;
             v.Margin = new Thickness(0, 5, 18, 4);
             if (!String.IsNullOrEmpty(toolTip)) v.ToolTip = toolTip;
             Grid.SetRow(l, row);
