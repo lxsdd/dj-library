@@ -112,6 +112,9 @@ namespace DJLibrary
             CheckBox cb = new CheckBox();
             cb.Content = new TextBlock {
                 Text = caption ?? "",
+                // The glyph has its own template spacing; reserve a visible,
+                // DPI-independent gap before the caption in all checkable dialogs.
+                Margin = new Thickness(8, 0, 0, 0),
                 VerticalAlignment = VerticalAlignment.Center,
                 TextAlignment = TextAlignment.Left,
                 TextWrapping = TextWrapping.NoWrap
@@ -132,6 +135,7 @@ namespace DJLibrary
                 cb.VerticalAlignment == VerticalAlignment.Center &&
                 cb.VerticalContentAlignment == VerticalAlignment.Center &&
                 text.VerticalAlignment == VerticalAlignment.Center &&
+                text.Margin.Left >= 7 && text.Margin.Top == 0 && text.Margin.Bottom == 0 &&
                 cb.Padding.Top == 0 && cb.Padding.Bottom == 0;
         }
 

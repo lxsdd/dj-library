@@ -20,6 +20,9 @@ namespace DJLibrary
         private readonly DataGrid _cdGrid;
         private readonly TabControl _tabs;
         private readonly TextBox _searchBox;
+        private readonly StackPanel _searchActions;
+        private readonly Button _resetFiltersButton;
+        private readonly WrapPanel _filterOptions;
         private readonly ComboBox _genreCombo;
         private readonly ComboBox _digitalCombo;
         private readonly ComboBox _yearCombo;
@@ -138,90 +141,94 @@ namespace DJLibrary
             DockPanel.SetDock(filterBorder, Dock.Top);
             root.Children.Add(filterBorder);
 
-            // v0.3.0: Filterfelder und Reset sind bewusst als zwei Bereiche aufgebaut.
-            // Links dürfen komplette Filtergruppen umbrechen; rechts bleibt der Reset-Button
-            // an der Filterleiste verankert. So entsteht bei normalen Desktopbreiten keine
-            // zweite Zeile nur für "Reset Filters" und es gibt weiterhin keinen
-            // horizontalen Scrollbereich für die Filter.
+            // Search + Reset stay permanently together at the left.
+            // Secondary groups are compact and wrap only when the actual
+            // window width is insufficient; never show a filter scrollbar.
             Grid filterLayout = new Grid();
-            filterLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             filterLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            filterLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             filterBorder.Child = filterLayout;
 
-            WrapPanel filter = new WrapPanel();
-            filter.Orientation = Orientation.Horizontal;
-            filter.VerticalAlignment = VerticalAlignment.Center;
-            Grid.SetColumn(filter, 0);
-            filterLayout.Children.Add(filter);
+            _searchActions = InlinePanel();
+            Grid.SetColumn(_searchActions, 0);
+            filterLayout.Children.Add(_searchActions);
 
-            StackPanel searchPanel = InlinePanel();
+            _filterOptions = new WrapPanel {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Grid.SetColumn(_filterOptions, 1);
+            filterLayout.Children.Add(_filterOptions);
+            WrapPanel filter = _filterOptions;
+
+            StackPanel searchPanel = _searchActions;
             searchPanel.Children.Add(FilterLabel("Search:", "Searches Artist, Title, Mix/Version, Album, Genre, Label, Catalog Number, and other core fields."));
             _searchBox = new TextBox();
-            _searchBox.Width = 270;
+            _searchBox.Width = 210;
             _searchBox.Height = 26;
             _searchBox.VerticalContentAlignment = VerticalAlignment.Center;
-            _searchBox.Margin = new Thickness(4, 0, 10, 0);
+            _searchBox.Margin = new Thickness(4, 0, 6, 0);
             _searchBox.ToolTip = "Free-text search. Multiple terms are combined with AND. Ctrl+F focuses this field.";
             searchPanel.Children.Add(_searchBox);
-            filter.Children.Add(searchPanel);
+            _resetFiltersButton = ToolButton("Reset Filters",
+                "Reset search and all filters for the current view (Ctrl+L).",
+                delegate { ResetFilters(); });
+            _resetFiltersButton.Height = 26;
+            _resetFiltersButton.Margin = new Thickness(0, 0, 10, 0);
+            _resetFiltersButton.VerticalAlignment = VerticalAlignment.Center;
+            searchPanel.Children.Add(_resetFiltersButton);
 
             StackPanel genrePanel = InlinePanel();
             genrePanel.Children.Add(FilterLabel("Genre:", "Filters by preferred genre. A strong digital match uses the current foobar GENRE; otherwise the historical collection genre is retained."));
-            _genreCombo = Combo(145, "Genre filter for the current view.");
+            _genreCombo = Combo(120, "Genre filter for the current view.");
             genrePanel.Children.Add(_genreCombo);
             filter.Children.Add(genrePanel);
 
             StackPanel digitalPanel = InlinePanel();
             digitalPanel.Children.Add(FilterLabel("Digital:", "Filters by automatic digital-match quality."));
-            _digitalCombo = Combo(135, "Final digital status is calculated automatically from the foobar Bridge index.");
+            _digitalCombo = Combo(105, "Final digital status is calculated automatically from the foobar Bridge index.");
             digitalPanel.Children.Add(_digitalCombo);
             filter.Children.Add(digitalPanel);
 
             StackPanel yearPanel = InlinePanel();
             yearPanel.Children.Add(FilterLabel("Year:", "Filters by release year."));
-            _yearCombo = Combo(80, "Year filter.");
+            _yearCombo = Combo(70, "Year filter.");
             yearPanel.Children.Add(_yearCombo);
             filter.Children.Add(yearPanel);
 
             StackPanel labelPanel = InlinePanel();
             labelPanel.Children.Add(FilterLabel("Label:", "Filters the current view by label."));
-            _labelCombo = Combo(135, "Label filter for tracks and CDs.");
+            _labelCombo = Combo(105, "Label filter for tracks and CDs.");
             labelPanel.Children.Add(_labelCombo);
             filter.Children.Add(labelPanel);
 
             StackPanel issuePanel = InlinePanel();
             issuePanel.Children.Add(FilterLabel("Check:", "Filters by documented legacy issues."));
-            _issueCombo = Combo(115, "Shows all, only records with issues, or only records without issues.");
+            _issueCombo = Combo(95, "Shows all, only records with issues, or only records without issues.");
             issuePanel.Children.Add(_issueCombo);
             filter.Children.Add(issuePanel);
 
             _mediumPanel = InlinePanel();
             _mediumPanel.Children.Add(FilterLabel("Medium:", "Filters CDs by medium type."));
-            _mediumCombo = Combo(110, "Medium type of the physical release.");
+            _mediumCombo = Combo(95, "Medium type of the physical release.");
             _mediumPanel.Children.Add(_mediumCombo);
             filter.Children.Add(_mediumPanel);
 
             _cdxPanel = InlinePanel();
             _cdxPanel.Children.Add(FilterLabel("Disc playable:", "Filters CDs and their tracks according to the configured physical-disc playback limit."));
-            _cdxCombo = Combo(115, "Compatibility of the containing physical disc: Yes, No, or Unknown.");
+            _cdxCombo = Combo(95, "Compatibility of the containing physical disc: Yes, No, or Unknown.");
             _cdxPanel.Children.Add(_cdxCombo);
             filter.Children.Add(_cdxPanel);
 
             _mixPanel = InlinePanel();
             _mixPanel.Children.Add(FilterLabel("Mix:", "Filters tracks by whether a separate Mix/Version value is present."));
-            _mixCombo = Combo(105, "Mix/Version filter.");
+            _mixCombo = Combo(90, "Mix/Version filter.");
             _mixPanel.Children.Add(_mixCombo);
             filter.Children.Add(_mixPanel);
 
             // Die Trefferzahl steht bereits vollständig in der Statusleiste. Sie wird
             // weiterhin intern gepflegt, aber nicht noch einmal in der Filterleiste angezeigt.
             _countText = new TextBlock();
-
-            Button resetFilters = ToolButton("Reset Filters", "Reset all search and filter conditions for the current view (Ctrl+L).", delegate { ResetFilters(); });
-            resetFilters.Margin = new Thickness(8, 0, 0, 0);
-            resetFilters.VerticalAlignment = VerticalAlignment.Center;
-            Grid.SetColumn(resetFilters, 1);
-            filterLayout.Children.Add(resetFilters);
 
             _tabs = new TabControl();
             root.Children.Add(_tabs);
@@ -1418,8 +1425,35 @@ namespace DJLibrary
             target.Issues = source.Issues ?? "";
         }
 
+        private void ValidateFilterToolbarLayoutContract()
+        {
+            if (_searchActions == null ||
+                _filterOptions == null || _resetFiltersButton == null ||
+                _searchActions.Orientation != Orientation.Horizontal ||
+                _filterOptions.Orientation != Orientation.Horizontal ||
+                _searchActions.Children.IndexOf(_resetFiltersButton) !=
+                    _searchActions.Children.IndexOf(_searchBox) + 1)
+                throw new InvalidOperationException("Filter toolbar: Reset Filters is not directly next to Search.");
+
+            Grid layout = _filterOptions.Parent as Grid;
+            if (layout == null ||
+                !Object.ReferenceEquals(_searchActions.Parent, layout) ||
+                Grid.GetColumn(_searchActions) != 0 || Grid.GetColumn(_filterOptions) != 1 ||
+                layout.ColumnDefinitions.Count != 2 ||
+                layout.ColumnDefinitions[0].Width.GridUnitType != GridUnitType.Auto ||
+                layout.ColumnDefinitions[1].Width.GridUnitType != GridUnitType.Star ||
+                _filterOptions.Orientation != Orientation.Horizontal ||
+                _searchBox.Width > 225 ||
+                _genreCombo.Width > 125 || _digitalCombo.Width > 110 ||
+                _labelCombo.Width > 110 || _cdxCombo.Width > 100 ||
+                !_filterOptions.Children.Contains(_cdxPanel) ||
+                !_filterOptions.Children.Contains(_mixPanel))
+                throw new InvalidOperationException("Filter toolbar: compact filters must wrap as groups only when width is insufficient, without a scrollbar.");
+        }
+
         internal string ValidateRuntimeUiContract()
     {
+        ValidateFilterToolbarLayoutContract();
         if (Icon == null) throw new InvalidOperationException("UI-Produktionspfad: MainWindow-Icon fehlt.");
         if (!GridRuntimeSupport.HasCdxColumn(_cdGrid) || !GridRuntimeSupport.HasCdxColumn(_trackGrid))
             throw new InvalidOperationException("UI production path: playback column missing from CD or track grid.");
