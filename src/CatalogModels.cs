@@ -68,15 +68,23 @@ namespace DJLibrary
                 return "Im Legacy-Bestand nicht erfasst / not checked";
             }
         }
-        public CdxCompatibilityState CdxCompatibilityState { get { return CdxCompatibility.Classify(Toc, TocComplete); } }
-        public string CdxCompatibilityText { get { return CdxCompatibility.Text(CdxCompatibilityState); } }
-        public string CdxCompatibilityCode { get { return CdxCompatibility.Code(CdxCompatibilityState); } }
+        public CdxCompatibilityState CdxCompatibilityState { get { return DiscPlaybackRule.Classify(Toc, TocComplete); } }
+        public string CdxCompatibilityText { get { return DiscPlaybackRule.Text(CdxCompatibilityState); } }
+        public string CdxCompatibilityCode { get { return DiscPlaybackRule.Code(CdxCompatibilityState, false); } }
         public int CdxCompatibilitySortKey { get { return CdxCompatibility.SortKey(CdxCompatibilityState); } }
-        public string CdxCompatibilityToolTip { get { return CdxCompatibility.ToolTip(CdxCompatibilityState); } }
+        public string CdxCompatibilityToolTip { get { return DiscPlaybackRule.Explanation(CdxCompatibilityState); } }
     }
 
     public sealed class CatalogTrack
     {
+        public string ParentDiscToc { get; set; }
+        public bool ParentDiscTocComplete { get; set; }
+        public CdxCompatibilityState CdxCompatibilityState { get { return DiscPlaybackRule.Classify(ParentDiscToc, ParentDiscTocComplete); } }
+        public string CdxCompatibilityText { get { return DiscPlaybackRule.Text(CdxCompatibilityState); } }
+        public string CdxCompatibilityCode { get { return DiscPlaybackRule.Code(CdxCompatibilityState, true); } }
+        public int CdxCompatibilitySortKey { get { return CdxCompatibility.SortKey(CdxCompatibilityState); } }
+        public string CdxCompatibilityToolTip { get { return DiscPlaybackRule.Explanation(CdxCompatibilityState); } }
+
         public long Id { get; set; }
         public long DiscId { get; set; }
         public int Position { get; set; }
