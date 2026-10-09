@@ -363,8 +363,8 @@ namespace DJLibrary
             AddTextColumn(grid, "Disc", "DiscNumber", 60);
             AddTextColumn(grid, "Medium", "Medium", 110);
             AddTextColumn(grid, "Duration", "DurationText", "DurationSeconds", 95);
-            grid.Columns.Add(GridRuntimeSupport.CreateCdxColumn(new ColumnSpec("CdxCompatibilitySortKey", "CDX Compatible",
-                "Numark CDX compatibility based on the complete physical TOC. Limit: 79:59:74.", "CdxCompatibilityText", 118, true)));
+            grid.Columns.Add(GridRuntimeSupport.CreateCdxColumn(new ColumnSpec("CdxCompatibilitySortKey", "Disc playable",
+                "Physical TOC-based compatibility using the current user-defined player rule.", "CdxCompatibilityText", 118, DiscPlaybackRule.Current.Enabled)));
             grid.AlternatingRowBackground = null;
             grid.RowStyle = GridRuntimeSupport.CreateCdxRowStyle();
             AddCheckColumn(grid, "TOC Complete", "TocComplete", 110, "Stored TOC is complete.");
@@ -378,7 +378,13 @@ namespace DJLibrary
             if (!GridRuntimeSupport.HasCdxColumn(grid)) throw new InvalidOperationException("UI-Produktionspfad: Catalog-Disc-Grid besitzt keine echte CDX-Spalte.");
             if (!GridRuntimeSupport.HasDeterministicCdxRowStyle(grid)) throw new InvalidOperationException("UI-Produktionspfad: Catalog-Disc-Grid besitzt keine deterministische CDX-Zeilenmarkierung gegen AlternatingRowBackground.");
             if (!GridRuntimeSupport.HasClipboardMenu(grid)) throw new InvalidOperationException("UI production path: Catalog disc grid has no clipboard menu.");
-            return "Catalog-Disc-Grid: CDX-Spalte + Rotmarkierung + Clipboard";
+            DataGrid tracks = CreateGrid();
+            tracks.Columns.Add(GridRuntimeSupport.CreateCdxColumn(new ColumnSpec("CdxCompatibilitySortKey", "Disc playable",
+                "Inherits the parent physical CD's TOC.", "CdxCompatibilityText", 112, true)));
+            tracks.RowStyle = GridRuntimeSupport.CreateCdxRowStyle();
+            if (!GridRuntimeSupport.HasCdxColumn(tracks) || !GridRuntimeSupport.HasDeterministicCdxRowStyle(tracks))
+                throw new InvalidOperationException("UI production path: catalog tracks lack playback-status column or row marker.");
+            return "Catalog: physical CD/track playability column + marker + Clipboard";
         }
 
         private void ConfigureTrackColumns()
@@ -390,6 +396,10 @@ namespace DJLibrary
             AddTextColumn(_trackGrid, "Genre", "Genre", 100);
             AddTextColumn(_trackGrid, "BPM", "Bpm", 65);
             AddTextColumn(_trackGrid, "Duration", "DurationText", "DurationSeconds", 86);
+            _trackGrid.Columns.Add(GridRuntimeSupport.CreateCdxColumn(new ColumnSpec("CdxCompatibilitySortKey", "Disc playable",
+                "Compatibility of this track's containing physical CD.", "CdxCompatibilityText", 112, DiscPlaybackRule.Current.Enabled)));
+            _trackGrid.AlternatingRowBackground = null;
+            _trackGrid.RowStyle = GridRuntimeSupport.CreateCdxRowStyle();
         }
 
         private static void AddTextColumn(DataGrid grid, string header, string path, double width)
@@ -483,6 +493,11 @@ namespace DJLibrary
         {
             CatalogDisc d = SelectedDisc;
             _tracks = d == null ? new List<CatalogTrack>() : _catalog.GetTracks(d.Id);
+            foreach (CatalogTrack track in _tracks)
+            {
+                track.ParentDiscToc = d.Toc;
+                track.ParentDiscTocComplete = d.TocComplete;
+            }
             string query = (_searchBox.Text ?? "").Trim();
             if (d != null && query.Length > 0)
                 _tracks = _tracks.Where(x => _searchResult.TrackIds.Contains(x.Id)).ToList();
