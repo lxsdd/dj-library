@@ -96,14 +96,15 @@ namespace DJLibrary
                 TextBlock header = c.Header as TextBlock;
                 if (header != null) label = header.Text;
 
-                CheckBox cb = new CheckBox();
-                cb.Content = label;
+                CheckBox cb = UiHelpers.AlignedCheckBox(label);
                 cb.IsChecked = c.Visibility == Visibility.Visible;
                 cb.Tag = c;
-                cb.Padding = new Thickness(4);
                 cb.ToolTip = header != null ? header.ToolTip : null;
 
                 ListBoxItem item = new ListBoxItem();
+                item.Padding = new Thickness(4, 0, 4, 0);
+                item.MinHeight = 30;
+                item.VerticalContentAlignment = VerticalAlignment.Center;
                 item.Content = cb;
                 item.Tag = c;
                 _list.Items.Add(item);
