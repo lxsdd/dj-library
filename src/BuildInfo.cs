@@ -20,6 +20,9 @@ namespace DJLibrary
 
             if (selfTest)
             {
+                DiscPlaybackRule.ValidateContract();
+                DiscPlaybackRuleWindow.ValidateLayoutContract();
+                ColumnsWindow.ValidateAlignmentContract();
                 CatalogMultiDiscCompatibility.ValidateSelfTest(AppDomain.CurrentDomain.BaseDirectory);
                 CdMetadataNetwork.RunSelfTest();
                 CdMetadataPostProcessor.RunSelfTest();
