@@ -433,13 +433,34 @@ namespace DJLibrary
         public string ReviewFieldSummary(IEnumerable<string> keys)
         {
             List<string> list=keys==null?new List<string>():keys.Where(x=>!String.IsNullOrWhiteSpace(x)).ToList();
-            List<string> changed=list.Where(IsOverride).Select(x=>FindRow(x)).Where(x=>x!=null).Select(x=>x.FieldLabel).Distinct(StringComparer.CurrentCultureIgnoreCase).ToList();
-            List<string> missing=list.Where(x=>IsBaseMissing(x) && !IsOverride(x)).Select(x=>FindRow(x)).Where(x=>x!=null).Select(x=>x.FieldLabel).Distinct(StringComparer.CurrentCultureIgnoreCase).ToList();
+            // Compact a single release/track row to field names users recognize.
+            // Cross-track summaries retain full labels so each track is identifiable.
+            bool oneRelease=list.Count>0 && list.All(x=>x.StartsWith("release.",StringComparison.OrdinalIgnoreCase));
+            string trackPrefix="";
+            if(list.Count>0 && list[0].StartsWith("track.",StringComparison.OrdinalIgnoreCase))
+            {
+                int lastDot=list[0].LastIndexOf('.');
+                if(lastDot>0) trackPrefix=list[0].Substring(0,lastDot+1);
+            }
+            bool oneTrack=trackPrefix.Length>0 && list.All(x=>x.StartsWith(trackPrefix,StringComparison.OrdinalIgnoreCase));
+            Func<string,string> fieldName=delegate(string key)
+            {
+                CdMetadataChoiceRow row=FindRow(key);
+                string label=row==null?"":row.FieldLabel??"";
+                if(oneRelease || oneTrack)
+                {
+                    int separator=label.IndexOf(" · ",StringComparison.Ordinal);
+                    if(separator>=0) return label.Substring(separator+3);
+                }
+                return label;
+            };
+            List<string> changed=list.Where(IsOverride).Select(fieldName).Where(x=>x.Length>0).Distinct(StringComparer.CurrentCultureIgnoreCase).ToList();
+            List<string> missing=list.Where(x=>IsBaseMissing(x) && !IsOverride(x)).Select(fieldName).Where(x=>x.Length>0).Distinct(StringComparer.CurrentCultureIgnoreCase).ToList();
             List<string> alternatives=list.Where(x=>
             {
                 CdMetadataChoiceRow row=FindRow(x);
                 return row!=null && row.HasConflict && !IsOverride(x) && !IsBaseMissing(x);
-            }).Select(x=>FindRow(x)).Where(x=>x!=null).Select(x=>x.FieldLabel).Distinct(StringComparer.CurrentCultureIgnoreCase).ToList();
+            }).Select(fieldName).Where(x=>x.Length>0).Distinct(StringComparer.CurrentCultureIgnoreCase).ToList();
 
             List<string> parts=new List<string>();
             if(changed.Count>0) parts.Add("Changed: "+String.Join(", ",changed.ToArray()));
