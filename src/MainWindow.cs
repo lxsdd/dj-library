@@ -20,6 +20,10 @@ namespace DJLibrary
         private readonly DataGrid _cdGrid;
         private readonly TabControl _tabs;
         private readonly TextBox _searchBox;
+        private readonly StackPanel _searchActions;
+        private readonly Button _resetFiltersButton;
+        private readonly ScrollViewer _filterScroll;
+        private readonly StackPanel _filterOptions;
         private readonly ComboBox _genreCombo;
         private readonly ComboBox _digitalCombo;
         private readonly ComboBox _yearCombo;
@@ -138,32 +142,49 @@ namespace DJLibrary
             DockPanel.SetDock(filterBorder, Dock.Top);
             root.Children.Add(filterBorder);
 
-            // v0.3.0: Filterfelder und Reset sind bewusst als zwei Bereiche aufgebaut.
-            // Links dürfen komplette Filtergruppen umbrechen; rechts bleibt der Reset-Button
-            // an der Filterleiste verankert. So entsteht bei normalen Desktopbreiten keine
-            // zweite Zeile nur für "Reset Filters" und es gibt weiterhin keinen
-            // horizontalen Scrollbereich für die Filter.
+            // Search + Reset stay together at the left. All secondary filter
+            // groups have a single stable baseline: overflow scrolls horizontally
+            // instead of wrapping into a second line at ordinary desktop widths.
             Grid filterLayout = new Grid();
-            filterLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             filterLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            filterLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             filterBorder.Child = filterLayout;
 
-            WrapPanel filter = new WrapPanel();
-            filter.Orientation = Orientation.Horizontal;
-            filter.VerticalAlignment = VerticalAlignment.Center;
-            Grid.SetColumn(filter, 0);
-            filterLayout.Children.Add(filter);
+            _searchActions = InlinePanel();
+            Grid.SetColumn(_searchActions, 0);
+            filterLayout.Children.Add(_searchActions);
 
-            StackPanel searchPanel = InlinePanel();
+            _filterOptions = new StackPanel {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            _filterScroll = new ScrollViewer {
+                Content = _filterOptions,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                CanContentScroll = false,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Grid.SetColumn(_filterScroll, 1);
+            filterLayout.Children.Add(_filterScroll);
+            StackPanel filter = _filterOptions;
+
+            StackPanel searchPanel = _searchActions;
             searchPanel.Children.Add(FilterLabel("Search:", "Searches Artist, Title, Mix/Version, Album, Genre, Label, Catalog Number, and other core fields."));
             _searchBox = new TextBox();
             _searchBox.Width = 270;
             _searchBox.Height = 26;
             _searchBox.VerticalContentAlignment = VerticalAlignment.Center;
-            _searchBox.Margin = new Thickness(4, 0, 10, 0);
+            _searchBox.Margin = new Thickness(4, 0, 6, 0);
             _searchBox.ToolTip = "Free-text search. Multiple terms are combined with AND. Ctrl+F focuses this field.";
             searchPanel.Children.Add(_searchBox);
-            filter.Children.Add(searchPanel);
+            _resetFiltersButton = ToolButton("Reset Filters",
+                "Reset search and all filters for the current view (Ctrl+L).",
+                delegate { ResetFilters(); });
+            _resetFiltersButton.Height = 26;
+            _resetFiltersButton.Margin = new Thickness(0, 0, 10, 0);
+            _resetFiltersButton.VerticalAlignment = VerticalAlignment.Center;
+            searchPanel.Children.Add(_resetFiltersButton);
 
             StackPanel genrePanel = InlinePanel();
             genrePanel.Children.Add(FilterLabel("Genre:", "Filters by preferred genre. A strong digital match uses the current foobar GENRE; otherwise the historical collection genre is retained."));
@@ -216,12 +237,6 @@ namespace DJLibrary
             // Die Trefferzahl steht bereits vollständig in der Statusleiste. Sie wird
             // weiterhin intern gepflegt, aber nicht noch einmal in der Filterleiste angezeigt.
             _countText = new TextBlock();
-
-            Button resetFilters = ToolButton("Reset Filters", "Reset all search and filter conditions for the current view (Ctrl+L).", delegate { ResetFilters(); });
-            resetFilters.Margin = new Thickness(8, 0, 0, 0);
-            resetFilters.VerticalAlignment = VerticalAlignment.Center;
-            Grid.SetColumn(resetFilters, 1);
-            filterLayout.Children.Add(resetFilters);
 
             _tabs = new TabControl();
             root.Children.Add(_tabs);
