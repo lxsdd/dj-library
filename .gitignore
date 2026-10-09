@@ -1,0 +1,10 @@
+ci/output/
+DJLibrary.exe
+SELF-TEST.txt
+SELF-TEST-ERROR.txt
+CI-*.txt
+portable/
+data/
+bridge-test/
+candidate/
+ci-failure/

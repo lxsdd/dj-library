@@ -1,0 +1,10 @@
+schema_version	1
+generation	7
+complete	1
+item_count	3
+last_change_utc	2026-09-28T20:58:00Z
+source_id	fixture-profile-001
+source_name	SelfTest foobar profile
+profile_path	C:\SelfTest\foobar2000-v2
+producer_version	0.1.0-rc2
+producer_pid	1234

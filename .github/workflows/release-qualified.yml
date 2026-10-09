@@ -1,0 +1,160 @@
+name: Release qualified DJ Library candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_run_id:
+        description: Successful Windows CI or DJ Library candidate workflow run ID
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify candidate run and locate exact artifact
+        id: candidate
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.candidate_run_id }}
+        run: |
+          set -euo pipefail
+          run_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID")"
+          conclusion="$(jq -r '.conclusion' <<<"$run_json")"
+          event="$(jq -r '.event' <<<"$run_json")"
+          head_branch="$(jq -r '.head_branch' <<<"$run_json")"
+          head_sha="$(jq -r '.head_sha' <<<"$run_json")"
+          workflow_path="$(jq -r '.path' <<<"$run_json")"
+
+          [[ "$conclusion" == "success" ]] || { echo "Candidate run is not successful." >&2; exit 1; }
+          [[ "$head_branch" == "main" ]] || { echo "Candidate run must target main; got $head_branch." >&2; exit 1; }
+          case "$workflow_path:$event" in
+            ".github/workflows/windows-ci.yml:push"|".github/workflows/windows-ci.yml:workflow_dispatch"|".github/workflows/candidate.yml:workflow_dispatch") ;;
+            *) echo "Unexpected qualification source: workflow=$workflow_path event=$event" >&2; exit 1 ;;
+          esac
+
+          expected_artifact="DJLibrary-qualified-$head_sha"
+          artifacts_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/artifacts?per_page=100")"
+          mapfile -t matches < <(jq -r --arg name "$expected_artifact" '.artifacts[] | select(.expired == false) | select(.name == $name) | [.id,.name] | @tsv' <<<"$artifacts_json")
+          [[ ${#matches[@]} -eq 1 ]] || { echo "Expected exactly one artifact named $expected_artifact, found ${#matches[@]}." >&2; exit 1; }
+          IFS=$'\t' read -r artifact_id artifact_name <<<"${matches[0]}"
+
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+          echo "artifact_id=$artifact_id" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=$artifact_name" >> "$GITHUB_OUTPUT"
+
+      - name: Download exact candidate artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ steps.candidate.outputs.artifact_name }}
+          path: candidate
+          run-id: ${{ inputs.candidate_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Verify artifact integrity, version, and commit binding
+        id: manifest
+        shell: bash
+        env:
+          HEAD_SHA: ${{ steps.candidate.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          cd candidate
+          test -f CI-VALIDATION.txt
+          test -f DJLibrary.exe
+          test -f SELF-TEST.txt
+
+          manifest_commit="$(sed -n 's/^commit=//p' CI-VALIDATION.txt | tr -d '\r')"
+          product_version="$(sed -n 's/^product_version=//p' CI-VALIDATION.txt | tr -d '\r')"
+          product_stage="$(sed -n 's/^product_stage=//p' CI-VALIDATION.txt | tr -d '\r')"
+          package_file="$(sed -n 's/^package_file=//p' CI-VALIDATION.txt | tr -d '\r')"
+          expected_zip="$(sed -n 's/^portable_sha256=//p' CI-VALIDATION.txt | tr -d '\r')"
+          expected_exe="$(sed -n 's/^exe_sha256=//p' CI-VALIDATION.txt | tr -d '\r')"
+          status="$(sed -n 's/^status=//p' CI-VALIDATION.txt | tr -d '\r')"
+          fixture_source="$(sed -n 's/^fixture_source=//p' CI-VALIDATION.txt | tr -d '\r')"
+          privacy_gate="$(sed -n 's/^privacy_gate=//p' CI-VALIDATION.txt | tr -d '\r')"
+          portable_data_policy="$(sed -n 's/^portable_data_policy=//p' CI-VALIDATION.txt | tr -d '\r')"
+
+          [[ "$manifest_commit" == "$HEAD_SHA" ]] || { echo "Manifest commit mismatch." >&2; exit 1; }
+          [[ "$status" == "PASS" ]] || { echo "Candidate manifest is not PASS." >&2; exit 1; }
+          [[ "$fixture_source" == "synthetic_v1" && "$privacy_gate" == "PASS" ]] || {
+            echo "PUBLIC_PRIVACY_GATE_BLOCKED: candidate lacks synthetic-only qualification." >&2; exit 1;
+          }
+          [[ "$portable_data_policy" == "no_catalog_no_fixtures" ]] || {
+            echo "PUBLIC_PRIVACY_GATE_BLOCKED: portable archive includes or may include collection data." >&2; exit 1;
+          }
+          [[ "$product_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid product version in manifest: $product_version" >&2; exit 1; }
+          [[ -z "$product_stage" ]] || { echo "Refusing final release of staged build: '$product_stage'." >&2; exit 1; }
+          [[ "$package_file" == "DJLibrary-Native-v${product_version}-portable.zip" ]] || { echo "Unexpected package filename: $package_file" >&2; exit 1; }
+          test -f "$package_file"
+          python3 - "$package_file" <<'PY'
+          import re, sys, zipfile
+          with zipfile.ZipFile(sys.argv[1]) as archive:
+              names = [n.replace(chr(92), '/') for n in archive.namelist()]
+              required = {'DJLibrary.exe', 'DJLibrary.ico', 'djmeta_native.dll',
+                          'rules/default-rules.json', 'README.md'}
+              if not required.issubset(names):
+                  raise SystemExit('Portable ZIP is missing an application asset')
+              forbidden = [
+                  n for n in names
+                  if re.search(r'(^|/)(data|bridge-test|ci|catalog-seed-v1[.]sqlite)(/|$)|[.](sqlite|sqlite3|db|tsv|gz|b64)$', n, re.I)
+              ]
+              if forbidden:
+                  raise SystemExit('PUBLIC_PRIVACY_GATE_BLOCKED: portable ZIP includes data/fixtures')
+          print('PASS: portable ZIP is application-only')
+          PY
+
+          actual_zip="$(sha256sum "$package_file" | awk '{print $1}')"
+          actual_exe="$(sha256sum DJLibrary.exe | awk '{print $1}')"
+          [[ "$actual_zip" == "$expected_zip" ]] || { echo "Portable ZIP SHA-256 mismatch." >&2; exit 1; }
+          [[ "$actual_exe" == "$expected_exe" ]] || { echo "Executable SHA-256 mismatch." >&2; exit 1; }
+
+          echo "product_version=$product_version" >> "$GITHUB_OUTPUT"
+          echo "package_file=$package_file" >> "$GITHUB_OUTPUT"
+          echo "tag=v$product_version" >> "$GITHUB_OUTPUT"
+
+      - name: Publish exact qualified candidate without rebuilding
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.manifest.outputs.tag }}
+          PRODUCT_VERSION: ${{ steps.manifest.outputs.product_version }}
+          PACKAGE_FILE: ${{ steps.manifest.outputs.package_file }}
+          HEAD_SHA: ${{ steps.candidate.outputs.head_sha }}
+          ARTIFACT_NAME: ${{ steps.candidate.outputs.artifact_name }}
+          ARTIFACT_ID: ${{ steps.candidate.outputs.artifact_id }}
+          RUN_ID: ${{ inputs.candidate_run_id }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; refusing replacement." >&2
+            exit 1
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists; refusing replacement." >&2
+            exit 1
+          fi
+          cat > release-notes.md <<EOF
+          DJ Library v$PRODUCT_VERSION
+
+          Qualified candidate promoted without rebuilding.
+
+          Commit: $HEAD_SHA
+          Candidate workflow run: $RUN_ID
+          Candidate artifact: $ARTIFACT_NAME
+          Artifact ID: $ARTIFACT_ID
+
+          The released files are byte-for-byte files downloaded from the successful qualification workflow.
+          EOF
+          gh release create "$TAG" \
+            "candidate/$PACKAGE_FILE" \
+            candidate/DJLibrary.exe \
+            candidate/SELF-TEST.txt \
+            candidate/CI-VALIDATION.txt \
+            --target "$HEAD_SHA" \
+            --title "DJ Library v$PRODUCT_VERSION" \
+            --notes-file release-notes.md

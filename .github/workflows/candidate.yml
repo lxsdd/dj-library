@@ -1,0 +1,11 @@
+name: DJ Library candidate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    uses: ./.github/workflows/windows-ci.yml

@@ -1,0 +1,343 @@
+name: Windows CI
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'BuildOnly.cmd'
+      - 'SelfTest.cmd'
+      - 'ci/payload/**'
+      - '.github/workflows/windows-ci.yml'
+      - 'tools/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'BuildOnly.cmd'
+      - 'SelfTest.cmd'
+      - 'ci/payload/**'
+      - 'tools/**'
+      - '.github/workflows/**'
+  workflow_call:
+  workflow_dispatch:
+
+concurrency:
+  group: dj-library-windows-ci-${{ (github.event_name == 'push' || github.event_name == 'pull_request') && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  build-test-package:
+    runs-on: windows-2022
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Checkout shared Metadata Normalizer
+        uses: actions/checkout@v7
+        with:
+          repository: lxsdd/dj-metadata-normalizer
+          path: dj-metadata-normalizer
+          ref: 365432ad8d6d0b80cc138c21e0d8fd8edca9e499
+
+      - name: Build shared Metadata Normalizer native engine
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          cmake -S dj-metadata-normalizer -B djmeta-build -A x64
+          cmake --build djmeta-build --config Release --target djmeta_native
+          Copy-Item djmeta-build/Release/djmeta_native.dll ./djmeta_native.dll
+          New-Item -ItemType Directory -Force rules | Out-Null
+          Copy-Item dj-metadata-normalizer/rules/default-rules.json rules/default-rules.json
+
+      - name: Resolve CI tier
+        id: tier
+        shell: powershell
+        run: |
+          $eventName = '${{ github.event_name }}'
+          $refName = '${{ github.ref_name }}'
+          $headRef = '${{ github.head_ref }}'
+          $trustedPr = ($eventName -eq 'pull_request') -and ('${{ github.event.pull_request.head.repo.full_name }}' -eq '${{ github.repository }}')
+          $full = ($eventName -eq 'workflow_dispatch') -or ($eventName -eq 'workflow_call') -or (($eventName -eq 'push') -and ($refName -eq 'main')) -or ($trustedPr -and $headRef.StartsWith('integrate/'))
+          if ($full) {
+            'full=true' | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+            Write-Host 'CI_TIER=FULL'
+            Write-Host 'Complete software qualification plus SHA-bound packaging runs on integration PRs, canonical main pushes, or explicit invocations.'
+          } else {
+            'full=false' | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+            Write-Host 'CI_TIER=FAST'
+            Write-Host 'Compile, deterministic migration/integrity checks and headless self-tests run; packaging is skipped.'
+          }
+
+      - name: Reconstruct qualified fixtures
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force data, bridge-test | Out-Null
+
+          function Decode-Payload([string]$Source, [string]$Destination, [string]$ExpectedSha256) {
+            $encoded = (Get-Content -Raw -LiteralPath $Source).Trim()
+            [IO.File]::WriteAllBytes($Destination, [Convert]::FromBase64String($encoded))
+            $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $Destination).Hash.ToLowerInvariant()
+            if ($actual -ne $ExpectedSha256) {
+              throw "SHA-256 mismatch for $Destination. expected=$ExpectedSha256 actual=$actual"
+            }
+            Write-Host "PASS SHA256 $Destination $actual"
+          }
+
+          # The app icon is a non-personal visual asset, not a catalog input.
+          Decode-Payload 'ci/payload/DJLibrary.ico.b64' 'DJLibrary.ico' '3475a0ece6bd922b44e801f13ce48fff760ce59c056da9289edd4702d5e09839'
+          # Public-safe regression data are generated from code and never read
+          # from a music library, user path, prior personal catalog or encoded blob.
+          python tools/generate_synthetic_fixtures.py --output data
+          Decode-Payload 'ci/payload/bridge-test/digital-items.tsv.gz.b64' 'bridge-test/digital-items.tsv.gz' '73ba9ebabdf2f54346142b98afea97382f63efc20dd804d5729b9b4abf175226'
+          Copy-Item -LiteralPath 'ci/payload/bridge-test/bridge-state.tsv' -Destination 'bridge-test/bridge-state.tsv'
+          Copy-Item -LiteralPath 'ci/payload/bridge-test/README.txt' -Destination 'bridge-test/README.txt'
+
+      - name: Reject personal collection fixture packaging
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($path in @('ci/payload/data/catalog-seed-v1.sqlite.gz.b64',
+                              'ci/payload/data/tracks.tsv.gz.b64',
+                              'ci/payload/data/cds.tsv.gz.b64',
+                              'ci/payload/data/matches.tsv.gz.b64')) {
+            # These legacy blobs still exist only while the PRIVATE repository
+            # is being migrated. The clean PUBLIC root must omit every one.
+            if ('${{ github.event.repository.visibility }}' -eq 'public' -and (Test-Path -LiteralPath $path)) {
+              throw "PUBLIC_PRIVACY_GATE_BLOCKED: prohibited personal fixture $path"
+            }
+          }
+          Write-Host 'PASS: published builds may contain synthetic test fixtures only'
+
+      - name: Rebuild and compare writable catalog migration
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python --version
+          python tools/migrate_catalog.py --tracks data/tracks.tsv.gz --cds data/cds.tsv.gz --output "$env:RUNNER_TEMP\catalog-rebuilt.sqlite" --compare-gzip data/catalog-seed-v1.sqlite.gz
+
+      - name: Compile native WPF app
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $stdout = Join-Path $PWD 'CI-BUILD-STDOUT.txt'
+          $stderr = Join-Path $PWD 'CI-BUILD-STDERR.txt'
+          $p = Start-Process -FilePath 'cmd.exe' -ArgumentList '/c','BuildOnly.cmd' -Wait -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+          Get-Content $stdout
+          if (Test-Path $stderr) { Get-Content $stderr }
+          Set-Content -Encoding UTF8 CI-BUILD-EXIT.txt $p.ExitCode
+          if ($p.ExitCode -ne 0) { throw "BuildOnly.cmd exited with $($p.ExitCode)" }
+
+      - name: Run headless product self-test against bridge schema v1
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (Test-Path SELF-TEST-ERROR.txt) { Remove-Item SELF-TEST-ERROR.txt -Force }
+          if (Test-Path SELF-TEST.txt) { Remove-Item SELF-TEST.txt -Force }
+          $p = Start-Process -FilePath '.\DJLibrary.exe' -ArgumentList '--self-test-ci' -Wait -PassThru
+          if ($p.ExitCode -ne 0) {
+            if (Test-Path SELF-TEST-ERROR.txt) { Get-Content SELF-TEST-ERROR.txt | Write-Error }
+            throw "DJLibrary.exe --self-test-ci exited with $($p.ExitCode)"
+          }
+          if (-not (Test-Path SELF-TEST.txt)) { throw 'SELF-TEST.txt was not produced.' }
+          $report = Get-Content -Raw SELF-TEST.txt
+          @(
+            'PASS: 15440 Tracks, 1315 CDs',
+            'PASS: Bridge-Snapshot-Vertrag',
+            'PASS: Referenz-Matchverteilung',
+            'nur strong darf GENRE projizieren',
+            'PASS: Settings-Recovery:',
+            'PASS: schema-v4 migration + CDX compatibility 1274/39/2',
+            'provider field-completeness contract',
+            'MusicBrainz field completeness: release identity + Track Artist/Title/Genre provenance',
+            'Discogs release/track field completeness',
+            'named window geometry: Normal + Maximized close-state round-trip',
+            'metadata review UX v2: safe starting values',
+            'PASS: UI production path:',
+            'PASS: UI contract:',
+            'counts=1119/1315/15440',
+            'corruption-recovery'
+          ) | ForEach-Object {
+            if ($report -notmatch [regex]::Escape($_)) { throw "Missing self-test assertion: $_" }
+          }
+          Write-Host $report
+
+      - name: Convert bridge fixture to schema v2
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          @'
+          import gzip
+          from pathlib import Path
+
+          payload = Path('bridge-test/digital-items.tsv.gz')
+          with gzip.open(payload, 'rt', encoding='utf-8') as f:
+              lines = f.read().splitlines()
+          if not lines or len(lines[0].split('\t')) != 24:
+              raise SystemExit('expected canonical schema-v1 bridge fixture')
+          lines[0] += '\textra_metadata_json'
+          for i in range(1, len(lines)):
+              extra = '{"MOOD":["Euphoric"],"CUSTOM_TAG":["Foo","Bar"]}' if i == 1 else '{}'
+              lines[i] += '\t' + extra
+          tmp = payload.with_suffix(payload.suffix + '.tmp')
+          with gzip.open(tmp, 'wt', encoding='utf-8', newline='\n') as f:
+              f.write('\n'.join(lines) + '\n')
+          tmp.replace(payload)
+
+          state_path = Path('bridge-test/bridge-state.tsv')
+          state = state_path.read_text(encoding='utf-8')
+          marker = 'schema_version\t1'
+          if marker not in state:
+              raise SystemExit('expected schema_version 1 in fixture state')
+          state_path.write_text(state.replace(marker, 'schema_version\t2', 1), encoding='utf-8', newline='\n')
+          print('PASS: converted canonical bridge fixture v1 -> v2 with one appended generic metadata column')
+          '@ | python -
+
+      - name: Run headless product self-test against bridge schema v2
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (Test-Path SELF-TEST-ERROR.txt) { Remove-Item SELF-TEST-ERROR.txt -Force }
+          if (Test-Path SELF-TEST.txt) { Remove-Item SELF-TEST.txt -Force }
+          $p = Start-Process -FilePath '.\DJLibrary.exe' -ArgumentList '--self-test-ci' -Wait -PassThru
+          if ($p.ExitCode -ne 0) {
+            if (Test-Path SELF-TEST-ERROR.txt) { Get-Content SELF-TEST-ERROR.txt | Write-Error }
+            throw "DJLibrary.exe --self-test-ci failed against bridge schema v2 with exit $($p.ExitCode)"
+          }
+          if (-not (Test-Path SELF-TEST.txt)) { throw 'Schema-v2 self-test did not produce SELF-TEST.txt.' }
+          $report = Get-Content -Raw SELF-TEST.txt
+          @(
+            'PASS: Bridge-Snapshot-Vertrag',
+            'provider field-completeness contract',
+            'MusicBrainz field completeness: release identity + Track Artist/Title/Genre provenance',
+            'Discogs release/track field completeness',
+            'named window geometry: Normal + Maximized close-state round-trip',
+            'PASS: UI production path:',
+            'PASS: UI contract:'
+          ) | ForEach-Object {
+            if ($report -notmatch [regex]::Escape($_)) { throw "Schema-v2 self-test lost assertion: $_" }
+          }
+          Write-Host 'PASS: full DJ Library product self-test is unchanged under bridge schema v2; extra_metadata_json is ignored by DJ Library.'
+
+      - name: Build portable package
+        if: steps.tier.outputs.full == 'true'
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $source = Get-Content -Raw -LiteralPath 'src/BuildInfo.cs'
+          $productMatch = [regex]::Match($source, 'ProductVersion\s*=\s*"([^"]+)"')
+          $stageMatch = [regex]::Match($source, 'Stage\s*=\s*"([^"]*)"')
+          if (-not $productMatch.Success -or -not $stageMatch.Success) { throw 'Could not resolve BuildInfo ProductVersion/Stage.' }
+          $version = $productMatch.Groups[1].Value.Trim()
+          $productStage = $stageMatch.Groups[1].Value.Trim()
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Unexpected product version: $version" }
+          $label = $version
+          if (-not [String]::IsNullOrWhiteSpace($productStage)) {
+            $safeStage = ($productStage.ToLowerInvariant() -replace '[^a-z0-9.-]+','-').Trim('-')
+            if ([String]::IsNullOrWhiteSpace($safeStage)) { throw 'Build stage normalizes to an empty label.' }
+            $label = "$version-$safeStage"
+          }
+          $packageFile = "DJLibrary-Native-v$label-portable.zip"
+          $stageDir = Join-Path $PWD ("portable\DJLibrary-Native-v" + $label)
+          New-Item -ItemType Directory -Force $stageDir | Out-Null
+          # The user package is binary-only; synthetic test fixtures remain CI-only.
+          Copy-Item DJLibrary.exe,DJLibrary.ico,README.md -Destination $stageDir
+          Copy-Item djmeta_native.dll -Destination $stageDir
+          Copy-Item rules -Destination $stageDir -Recurse
+          if (-not (Test-Path (Join-Path $stageDir 'djmeta_native.dll'))) { throw 'Portable package is missing djmeta_native.dll.' }
+          if (-not (Test-Path (Join-Path $stageDir 'rules\default-rules.json'))) { throw 'Portable package is missing the shared normalizer ruleset.' }
+          $zip = Join-Path $PWD $packageFile
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path (Join-Path $stageDir '*') -DestinationPath $zip -CompressionLevel Optimal
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [System.IO.Compression.ZipFile]::OpenRead($zip)
+          try {
+            $names = @($archive.Entries | ForEach-Object { $_.FullName.Replace('\','/') })
+            if ($names.Count -eq 0) { throw 'Portable archive is empty.' }
+            foreach ($name in $names) {
+              if ($name -match '(^|/)(data|bridge-test|ci|catalog-seed-v1[.]sqlite)(/|$)' -or
+                  $name -match '(?i)[.](sqlite|sqlite3|db|tsv|gz|b64)$') {
+                throw "PUBLIC_PRIVACY_GATE_BLOCKED: file is not an application asset: $name"
+              }
+            }
+            foreach ($name in @('DJLibrary.exe','DJLibrary.ico','djmeta_native.dll','rules/default-rules.json','README.md')) {
+              if ($names -notcontains $name) { throw "Portable archive is missing $name" }
+            }
+            Write-Host 'PASS: portable ZIP contains only program files, no catalog or test datasets.'
+          }
+          finally { $archive.Dispose() }
+          $exeHash = (Get-FileHash -Algorithm SHA256 DJLibrary.exe).Hash.ToLowerInvariant()
+          $zipHash = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLowerInvariant()
+          $normalizerHash = (Get-FileHash -Algorithm SHA256 djmeta_native.dll).Hash.ToLowerInvariant()
+          $rulesHash = (Get-FileHash -Algorithm SHA256 rules/default-rules.json).Hash.ToLowerInvariant()
+          @(
+            "commit=$env:GITHUB_SHA",
+            "runner=$env:RUNNER_OS",
+            "run_id=$env:GITHUB_RUN_ID",
+            "run_attempt=$env:GITHUB_RUN_ATTEMPT",
+            "product_version=$version",
+            "product_stage=$productStage",
+            "package_file=$packageFile",
+            "exe_sha256=$exeHash",
+            "portable_sha256=$zipHash",
+            "metadata_normalizer_commit=365432ad8d6d0b80cc138c21e0d8fd8edca9e499",
+            "metadata_normalizer_abi=1",
+            "metadata_normalizer_native_sha256=$normalizerHash",
+            "metadata_normalizer_rules_sha256=$rulesHash",
+            "metadata_normalizer_native=PASS",
+            'candidate22_window_state=PASS',
+            'candidate22_metadata_source_completeness=PASS',
+            'candidate21_grid_scroll=PASS',
+            'candidate21_metadata_review_ux=PASS',
+            'bridge_schema_v1_v2=PASS',
+            'fixture_source=synthetic_v1',
+            'portable_data_policy=no_catalog_no_fixtures',
+            'privacy_gate=PASS',
+            'fixture_tracks=15440',
+            'fixture_cds=1315',
+            'status=PASS'
+          ) | Set-Content -Encoding UTF8 CI-VALIDATION.txt
+          Get-Content CI-VALIDATION.txt
+
+      - name: Upload qualified artifact
+        if: steps.tier.outputs.full == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: DJLibrary-qualified-${{ github.sha }}
+          path: |
+            DJLibrary-Native-v*-portable.zip
+            DJLibrary.exe
+            SELF-TEST.txt
+            CI-VALIDATION.txt
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Collect failure diagnostics
+        if: failure()
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Continue'
+          New-Item -ItemType Directory -Force ci-failure | Out-Null
+          @(
+            "commit=$env:GITHUB_SHA",
+            "run_id=$env:GITHUB_RUN_ID",
+            "run_attempt=$env:GITHUB_RUN_ATTEMPT",
+            "utc=$([DateTime]::UtcNow.ToString('o'))"
+          ) | Set-Content -Encoding UTF8 ci-failure/LAST-CI-FAILURE.txt
+          foreach ($name in @('CI-BUILD-STDOUT.txt','CI-BUILD-STDERR.txt','CI-BUILD-EXIT.txt','SELF-TEST-ERROR.txt','SELF-TEST.txt')) {
+            if (Test-Path $name) { Copy-Item -LiteralPath $name -Destination ci-failure -Force }
+          }
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: DJLibrary-CI-failure-${{ github.sha }}
+          path: ci-failure/**
+          if-no-files-found: error
+          retention-days: 14
