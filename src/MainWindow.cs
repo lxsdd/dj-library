@@ -1207,7 +1207,7 @@ namespace DJLibrary
             SetComboItems(_digitalCombo, null, digital, state.Digital);
 
             _mediumPanel.Visibility = tracks ? Visibility.Collapsed : Visibility.Visible;
-            _cdxPanel.Visibility = tracks ? Visibility.Collapsed : Visibility.Visible;
+            _cdxPanel.Visibility = DiscPlaybackRule.Current.Enabled ? Visibility.Visible : Visibility.Collapsed;
             _mixPanel.Visibility = tracks ? Visibility.Visible : Visibility.Collapsed;
 
             List<string> cdxValues = new List<string>();
@@ -1215,7 +1215,7 @@ namespace DJLibrary
             cdxValues.Add("Yes");
             cdxValues.Add("No");
             cdxValues.Add("Unknown");
-            SetComboItems(_cdxCombo, null, cdxValues, tracks ? "" : state.Cdx);
+            SetComboItems(_cdxCombo, null, cdxValues, state.Cdx);
 
             if (!tracks)
             {
@@ -1256,7 +1256,7 @@ namespace DJLibrary
             state.Digital = Selected(_digitalCombo);
             state.Year = Selected(_yearCombo);
             state.Medium = Selected(_mediumCombo);
-            state.Cdx = _tabs.SelectedIndex == 1 ? Selected(_cdxCombo) : "";
+            state.Cdx = DiscPlaybackRule.Current.Enabled ? Selected(_cdxCombo) : "";
             state.Mix = Selected(_mixCombo);
             state.Label = Selected(_labelCombo);
             state.Issues = Selected(_issueCombo);
@@ -1313,6 +1313,10 @@ namespace DJLibrary
                 if (digital == "No Match" && t.DigitalLevel != "none") return false;
             }
 
+            string cdx = _trackFilter.Cdx;
+            if (DiscPlaybackRule.Current.Enabled && !String.IsNullOrEmpty(cdx) && cdx != "All" &&
+                !String.Equals(t.CdxCompatibilityText, cdx, StringComparison.OrdinalIgnoreCase)) return false;
+
             string mix = _trackFilter.Mix;
             if (mix == "With Mix" && String.IsNullOrEmpty(t.Version)) return false;
             if (mix == "Without Mix" && !String.IsNullOrEmpty(t.Version)) return false;
@@ -1343,7 +1347,8 @@ namespace DJLibrary
             if (!String.IsNullOrEmpty(medium) && medium != "All" && !String.Equals(c.Medium, medium, StringComparison.OrdinalIgnoreCase)) return false;
 
             string cdx = _cdFilter.Cdx;
-            if (!String.IsNullOrEmpty(cdx) && cdx != "All" && !String.Equals(c.CdxCompatibilityText, cdx, StringComparison.OrdinalIgnoreCase)) return false;
+            if (DiscPlaybackRule.Current.Enabled && !String.IsNullOrEmpty(cdx) && cdx != "All" &&
+                !String.Equals(c.CdxCompatibilityText, cdx, StringComparison.OrdinalIgnoreCase)) return false;
 
             string digital = _cdFilter.Digital;
             if (!String.IsNullOrEmpty(digital) && digital != "All")
@@ -1387,7 +1392,7 @@ namespace DJLibrary
             if (!String.IsNullOrEmpty(state.Label) && state.Label != "All Labels") n++;
             if (!String.IsNullOrEmpty(state.Issues) && state.Issues != "All") n++;
             if (!String.IsNullOrEmpty(state.Medium) && state.Medium != "All") n++;
-            if (!String.IsNullOrEmpty(state.Cdx) && state.Cdx != "All") n++;
+            if (DiscPlaybackRule.Current.Enabled && !String.IsNullOrEmpty(state.Cdx) && state.Cdx != "All") n++;
             if (!String.IsNullOrEmpty(state.Mix) && state.Mix != "All") n++;
             return n;
         }
@@ -1416,7 +1421,8 @@ namespace DJLibrary
         internal string ValidateRuntimeUiContract()
     {
         if (Icon == null) throw new InvalidOperationException("UI-Produktionspfad: MainWindow-Icon fehlt.");
-        if (!GridRuntimeSupport.HasCdxColumn(_cdGrid)) throw new InvalidOperationException("UI-Produktionspfad: MainWindow-CD-Grid besitzt keine echte CDX-Spalte.");
+        if (!GridRuntimeSupport.HasCdxColumn(_cdGrid) || !GridRuntimeSupport.HasCdxColumn(_trackGrid))
+            throw new InvalidOperationException("UI production path: playback column missing from CD or track grid.");
         if (_cdGrid.RowStyle == null) throw new InvalidOperationException("UI-Produktionspfad: MainWindow-CD-Grid besitzt keine CDX-Zeilenmarkierung.");
         if (!GridRuntimeSupport.HasClipboardMenu(_cdGrid) || !GridRuntimeSupport.HasClipboardMenu(_trackGrid))
             throw new InvalidOperationException("UI-Produktionspfad: Clipboard-Wiring fehlt an MainWindow-Grids.");
@@ -1436,6 +1442,10 @@ namespace DJLibrary
         _cdFilter.Cdx = old;
         if (!acceptsNo || !rejectsYes) throw new InvalidOperationException("UI production path: CDX filter predicate is ineffective.");
         if (incompatible.CdxCompatibilityText != "No") throw new InvalidOperationException("UI production path: CDX No contains unexpected extra glyphs.");
+        TrackRow incompatibleTrack = _data.Tracks.FirstOrDefault(x => x.DiscId == incompatible.DiscId);
+        if (incompatibleTrack == null || incompatibleTrack.CdxCompatibilityText != "No" ||
+            incompatibleTrack.DiscToc != incompatible.Toc)
+            throw new InvalidOperationException("UI production path: tracks did not inherit their parent disc playback limit.");
 
         return "MainWindow: CDX-Spalte + disc-spezifische Rotmarkierung + Filter Yes/No/Unknown + explizites Clipboard + Icon";
     }
@@ -1445,6 +1455,24 @@ namespace DJLibrary
             FilterState copy = new FilterState();
             CopyFilter(source, copy);
             return copy;
+        }
+
+        private void RefreshPlaybackRuleViews()
+        {
+            // Profile setting already saved atomically by the rule dialog.
+            _trackFilter.Cdx = "";
+            _cdFilter.Cdx = "";
+            foreach (DataGrid grid in new[] { _trackGrid, _cdGrid })
+            {
+                DataGridColumn column = grid.Columns.FirstOrDefault(x => x.SortMemberPath == "CdxCompatibilitySortKey");
+                if (column != null) column.Visibility = DiscPlaybackRule.Current.Enabled ? Visibility.Visible : Visibility.Collapsed;
+            }
+            PopulateFilterOptions();
+            _trackView.Refresh();
+            _cdView.Refresh();
+            _trackGrid.Items.Refresh();
+            _cdGrid.Items.Refresh();
+            RefreshCurrentView();
         }
 
         private void ConfigureColumns()
