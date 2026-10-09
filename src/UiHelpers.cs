@@ -105,6 +105,36 @@ namespace DJLibrary
             return layout.Replace('_', ' ');
         }
 
+        // Shared baseline contract: text and the interactive checkbox glyph
+        // must occupy the same vertically centered row across WPF dialogs.
+        public static CheckBox AlignedCheckBox(string caption)
+        {
+            CheckBox cb = new CheckBox();
+            cb.Content = new TextBlock {
+                Text = caption ?? "",
+                VerticalAlignment = VerticalAlignment.Center,
+                TextAlignment = TextAlignment.Left,
+                TextWrapping = TextWrapping.NoWrap
+            };
+            cb.MinHeight = 26;
+            cb.Padding = new Thickness(0);
+            cb.Margin = new Thickness(0);
+            cb.VerticalAlignment = VerticalAlignment.Center;
+            cb.VerticalContentAlignment = VerticalAlignment.Center;
+            cb.HorizontalAlignment = HorizontalAlignment.Stretch;
+            return cb;
+        }
+
+        public static bool IsAlignedCheckBox(CheckBox cb)
+        {
+            TextBlock text = cb == null ? null : cb.Content as TextBlock;
+            return cb != null && text != null &&
+                cb.VerticalAlignment == VerticalAlignment.Center &&
+                cb.VerticalContentAlignment == VerticalAlignment.Center &&
+                text.VerticalAlignment == VerticalAlignment.Center &&
+                cb.Padding.Top == 0 && cb.Padding.Bottom == 0;
+        }
+
         public static TextBlock Header(string text, string toolTip)
         {
             TextBlock tb = new TextBlock();
