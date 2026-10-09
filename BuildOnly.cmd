@@ -64,6 +64,7 @@ echo.
   /reference:"%SEC%" ^
   "src\BuildInfo.cs" ^
   "src\CdxCompatibility.cs" ^
+  "src\DiscPlaybackRuleWindow.cs" ^
   "src\Models.cs" ^
   "src\CatalogNativeModels.cs" ^
   "src\DataStore.cs" ^
