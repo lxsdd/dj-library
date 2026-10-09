@@ -1433,8 +1433,34 @@ namespace DJLibrary
             target.Issues = source.Issues ?? "";
         }
 
+        private void ValidateFilterToolbarLayoutContract()
+        {
+            if (_searchActions == null || _filterScroll == null ||
+                _filterOptions == null || _resetFiltersButton == null ||
+                _searchActions.Orientation != Orientation.Horizontal ||
+                _filterOptions.Orientation != Orientation.Horizontal ||
+                _searchActions.Children.IndexOf(_resetFiltersButton) !=
+                    _searchActions.Children.IndexOf(_searchBox) + 1)
+                throw new InvalidOperationException("Filter toolbar: Reset Filters is not directly next to Search.");
+
+            Grid layout = _filterScroll.Parent as Grid;
+            if (layout == null || !Object.ReferenceEquals(_filterScroll.Content, _filterOptions) ||
+                !Object.ReferenceEquals(_searchActions.Parent, layout) ||
+                Grid.GetColumn(_searchActions) != 0 || Grid.GetColumn(_filterScroll) != 1 ||
+                layout.ColumnDefinitions.Count != 2 ||
+                layout.ColumnDefinitions[0].Width.GridUnitType != GridUnitType.Auto ||
+                layout.ColumnDefinitions[1].Width.GridUnitType != GridUnitType.Star ||
+                _filterScroll.HorizontalScrollBarVisibility != ScrollBarVisibility.Auto ||
+                _filterScroll.VerticalScrollBarVisibility != ScrollBarVisibility.Disabled ||
+                _filterOptions.Children.OfType<WrapPanel>().Any() ||
+                !_filterOptions.Children.Contains(_cdxPanel) ||
+                !_filterOptions.Children.Contains(_mixPanel))
+                throw new InvalidOperationException("Filter toolbar: secondary filters must remain one horizontal, scrollable row.");
+        }
+
         internal string ValidateRuntimeUiContract()
     {
+        ValidateFilterToolbarLayoutContract();
         if (Icon == null) throw new InvalidOperationException("UI-Produktionspfad: MainWindow-Icon fehlt.");
         if (!GridRuntimeSupport.HasCdxColumn(_cdGrid) || !GridRuntimeSupport.HasCdxColumn(_trackGrid))
             throw new InvalidOperationException("UI production path: playback column missing from CD or track grid.");
