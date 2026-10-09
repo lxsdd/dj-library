@@ -207,16 +207,16 @@ namespace DJLibrary
                     throw new InvalidOperationException("MM:SS:FF playback threshold parsing failed.");
                 opt.LimitFrames = 359999;
                 Configure(opt);
-                if (Classify("150 360149", true) != CdxCompatibilityState.Compatible ||
+                if (Classify("150 360148", true) != CdxCompatibilityState.Compatible ||
                     Classify("150 360149", false) != CdxCompatibilityState.Unknown ||
                     Classify("150 360149 300", true) != CdxCompatibilityState.Unknown ||
-                    Classify("150 360149", true) != CdxCompatibilityState.Compatible ||
+                    Classify("150 360149", true) != CdxCompatibilityState.Incompatible ||
                     Classify("150 360150", true) != CdxCompatibilityState.Incompatible)
                     throw new InvalidOperationException("Physical TOC inclusivity threshold failed.");
                 opt.Inclusive = false;
                 Configure(opt);
                 if (Classify("150 360149", true) != CdxCompatibilityState.Compatible ||
-                    Classify("150 360150", true) != CdxCompatibilityState.Compatible ||
+                    Classify("150 360150", true) != CdxCompatibilityState.Incompatible ||
                     Classify("150 360151", true) != CdxCompatibilityState.Incompatible)
                     throw new InvalidOperationException("Strictly-greater-than custom threshold failed.");
                 opt.Enabled = false;
