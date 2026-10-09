@@ -10,6 +10,12 @@ Existing user catalogs are reused from the local profile at `catalog-v0.4.sqlite
 
 The `foo_dj_library_bridge` is read-only. Metadata normalization in the app is preview-only. Nothing writes to MP3 tags or foobar metadata in the background.
 
+## Configurable physical-disc playback check
+
+Open **Tools → Disc Playback Rule…** to enable or disable the playback rule, choose a descriptive player name, enter an exact 75 fps limit such as `79:59:74`, choose `>=` or `>`, and control red/amber CD and track row highlighting independently. The default preserves the previous Numark CDX limit and red marking. **Disc playable** columns in Tracks and CDs, plus the status filter, use one physical TOC-based calculation; every track inherits its containing physical CD's status.
+
+A disc with no **complete, valid TOC** is always `Unknown`: the app never classifies it from guessed per-track durations. Disabling the rule hides the related main-list columns and filter and stops row highlighting. This is a presentation preference; it never modifies the physical catalog or audio tags.
+
 ## Development and CI
 
 Run the Windows CI workflow in GitHub Actions. The CI generates synthetic physical/digital data with `tools/generate_synthetic_fixtures.py` and exercises the full application self-test, SQLite migration, CDX edge cases, native metadata normalizer and GUI production-path contracts. It produces SHA-bound qualification manifests and packages only when the full gate is authorized.
