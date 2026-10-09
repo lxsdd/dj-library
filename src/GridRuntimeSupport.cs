@@ -189,11 +189,21 @@ namespace DJLibrary
 
         private sealed class CdxBackgroundConverter : IValueConverter
         {
+            private static readonly Brush Red = FrozenWarningBrush(255,236,236);
+            private static readonly Brush Orange = FrozenWarningBrush(255,244,219);
+
+            private static Brush FrozenWarningBrush(byte r, byte g, byte b)
+            {
+                SolidColorBrush brush = new SolidColorBrush(Color.FromRgb(r,g,b));
+                brush.Freeze();
+                return brush;
+            }
+
             public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
             {
-                return String.Equals(value as string, "no", StringComparison.Ordinal)
-                    ? (Brush)new SolidColorBrush(Color.FromRgb(255, 236, 236))
-                    : SystemColors.WindowBrush;
+                if (!String.Equals(value as string, "no", StringComparison.Ordinal))
+                    return SystemColors.WindowBrush;
+                return DiscPlaybackRule.Current.WarningColor == "Orange" ? Orange : Red;
             }
             public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
             {
