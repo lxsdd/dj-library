@@ -819,7 +819,7 @@ namespace DJLibrary
 
         public static CheckBox AddCheckBox(Grid g, int row, bool value, string toolTip)
         {
-            CheckBox b = new CheckBox { IsChecked=value, Margin=new Thickness(0,6,0,6), VerticalAlignment=VerticalAlignment.Center };
+            CheckBox b = new CheckBox { IsChecked=value, Margin=new Thickness(0,4,0,4), VerticalAlignment=VerticalAlignment.Center, VerticalContentAlignment=VerticalAlignment.Center };
             if (!String.IsNullOrEmpty(toolTip)) b.ToolTip = toolTip;
             Grid.SetRow(b,row); Grid.SetColumn(b,1); g.Children.Add(b); return b;
         }
