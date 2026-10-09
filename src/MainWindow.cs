@@ -58,6 +58,7 @@ namespace DJLibrary
         {
             _data = data;
             _settings = SettingsManager.Load();
+            DiscPlaybackRule.Configure(_settings.DiscPlayback);
             _lastMainMaximized = _settings.Maximized;
             _bridgeDirectoryPinned = !String.IsNullOrWhiteSpace(_settings.BridgeDirectory);
             _bridgeDirectory = ResolveInitialBridgeDirectory(_settings.BridgeDirectory);
@@ -201,8 +202,8 @@ namespace DJLibrary
             filter.Children.Add(_mediumPanel);
 
             _cdxPanel = InlinePanel();
-            _cdxPanel.Children.Add(FilterLabel("CDX Compatible:", "Filters physical discs using the complete TOC. Limit: 79:59:74."));
-            _cdxCombo = Combo(115, "Numark CDX compatibility: Yes, No, or Unknown.");
+            _cdxPanel.Children.Add(FilterLabel("Disc playable:", "Filters CDs and their tracks according to the configured physical-disc playback limit."));
+            _cdxCombo = Combo(115, "Compatibility of the containing physical disc: Yes, No, or Unknown.");
             _cdxPanel.Children.Add(_cdxCombo);
             filter.Children.Add(_cdxPanel);
 
@@ -243,12 +244,19 @@ namespace DJLibrary
             AddColumns(_cdGrid, _cdColumns);
             _cdGrid.AlternatingRowBackground = null;
             _cdGrid.RowStyle = GridRuntimeSupport.CreateCdxRowStyle();
+            _trackGrid.AlternatingRowBackground = null;
+            _trackGrid.RowStyle = GridRuntimeSupport.CreateCdxRowStyle();
             bool cdxLayoutKnown = _settings.CdColumns != null && _settings.CdColumns.Any(delegate(ColumnSetting s)
             {
                 return String.Equals(s.Key, "CdxCompatibilitySortKey", StringComparison.OrdinalIgnoreCase);
             });
             SettingsManager.ApplyColumns(_trackGrid, _settings.TrackColumns);
             SettingsManager.ApplyColumns(_cdGrid, _settings.CdColumns);
+            if (!DiscPlaybackRule.Current.Enabled)
+            {
+                _trackGrid.Columns.First(x => x.SortMemberPath == "CdxCompatibilitySortKey").Visibility = Visibility.Collapsed;
+                _cdGrid.Columns.First(x => x.SortMemberPath == "CdxCompatibilitySortKey").Visibility = Visibility.Collapsed;
+            }
             if (!cdxLayoutKnown) PlaceColumnAfter(_cdGrid, "CdxCompatibilitySortKey", "DurationSeconds");
             AttachColumnContextMenus(_trackGrid);
             AttachColumnContextMenus(_cdGrid);
@@ -377,6 +385,11 @@ namespace DJLibrary
             discogs.ToolTip = "Configure the personal Discogs API token for independent CD searches. The token is encrypted for the current Windows user with DPAPI.";
             discogs.Click += delegate { DiscogsSettingsDialog.Show(this); };
             extras.Items.Add(discogs);
+            extras.Items.Add(new Separator());
+            MenuItem playback = new MenuItem { Header = "_Disc Playback Rule…" };
+            playback.ToolTip = "Configure physical CD playability, MM:SS:FF limit and optional CD/track highlighting.";
+            playback.Click += delegate { new DiscPlaybackRuleWindow(this, RefreshPlaybackRuleViews).ShowDialog(); };
+            extras.Items.Add(playback);
             extras.Items.Add(new Separator());
             MenuItem genres = new MenuItem { Header = "_Genre Matching Status…" };
             genres.ToolTip = "Show how many historical genres were safely updated from the digital foobar collection.";
@@ -913,6 +926,7 @@ namespace DJLibrary
             x.Add(new ColumnSpec("TrackNumber", "#", "Track number on the disc.", "TrackNumber", 48, true));
             x.Add(new ColumnSpec("DiscNumber", "Disc", "Disc number within a multi-disc set.", "DiscText", 58, true));
             x.Add(new ColumnSpec("DurationSeconds", "Duration", "Track duration.", "DurationText", 78, true));
+            x.Add(new ColumnSpec("CdxCompatibilitySortKey", "Disc playable", "Compatibility of the physical CD containing this track (configurable under Tools → Disc Playback Rule).", "CdxCompatibilityText", 112, true));
             x.Add(new ColumnSpec("Date", "Year", "Release year / DATE.", "Date", 68, true));
             x.Add(new ColumnSpec("Genre", "Genre", "Preferred genre: use foobar GENRE for a strong digital match; otherwise keep the historical collection genre.", "Genre", 150, true));
             x.Add(new ColumnSpec("GenreSourceText", "Genre-Source", "Shows whether the displayed genre comes from a strong digital match or the legacy database.", "GenreSourceText", 190, false));
@@ -932,7 +946,7 @@ namespace DJLibrary
             x.Add(new ColumnSpec("DiscNumber", "Disc", "Disc Number innerhalb eines Mehrfachsets.", "DiscText", 62, true));
             x.Add(new ColumnSpec("Tracks", "Tracks", "Number of logically cataloged tracks.", "Tracks", 65, true));
             x.Add(new ColumnSpec("DurationSeconds", "Total Duration", "Physical CD duration, primarily derived from TOC and lead-out.", "DurationText", 90, true));
-            x.Add(new ColumnSpec("CdxCompatibilitySortKey", "CDX Compatible", "Numark CDX compatibility based on the complete physical TOC. Limit: 79:59:74.", "CdxCompatibilityText", 118, true));
+            x.Add(new ColumnSpec("CdxCompatibilitySortKey", "Disc playable", "Configurable physical CD playback rule; 75 frames/second, derived from complete TOC.", "CdxCompatibilityText", 118, true));
             x.Add(new ColumnSpec("Date", "Year", "Release year / DATE.", "Date", 68, true));
             x.Add(new ColumnSpec("Genre", "Genre", "Preferred CD genre. Updated only when strongly matched digital track genres reach a strong consensus.", "Genre", 160, true));
             x.Add(new ColumnSpec("GenreSourceText", "Genre-Source", "Shows whether the CD genre comes from digital track consensus or the legacy database.", "GenreSourceText", 175, false));
@@ -1193,7 +1207,7 @@ namespace DJLibrary
             SetComboItems(_digitalCombo, null, digital, state.Digital);
 
             _mediumPanel.Visibility = tracks ? Visibility.Collapsed : Visibility.Visible;
-            _cdxPanel.Visibility = tracks ? Visibility.Collapsed : Visibility.Visible;
+            _cdxPanel.Visibility = DiscPlaybackRule.Current.Enabled ? Visibility.Visible : Visibility.Collapsed;
             _mixPanel.Visibility = tracks ? Visibility.Visible : Visibility.Collapsed;
 
             List<string> cdxValues = new List<string>();
@@ -1201,7 +1215,7 @@ namespace DJLibrary
             cdxValues.Add("Yes");
             cdxValues.Add("No");
             cdxValues.Add("Unknown");
-            SetComboItems(_cdxCombo, null, cdxValues, tracks ? "" : state.Cdx);
+            SetComboItems(_cdxCombo, null, cdxValues, state.Cdx);
 
             if (!tracks)
             {
@@ -1242,7 +1256,7 @@ namespace DJLibrary
             state.Digital = Selected(_digitalCombo);
             state.Year = Selected(_yearCombo);
             state.Medium = Selected(_mediumCombo);
-            state.Cdx = _tabs.SelectedIndex == 1 ? Selected(_cdxCombo) : "";
+            state.Cdx = DiscPlaybackRule.Current.Enabled ? Selected(_cdxCombo) : "";
             state.Mix = Selected(_mixCombo);
             state.Label = Selected(_labelCombo);
             state.Issues = Selected(_issueCombo);
@@ -1299,6 +1313,10 @@ namespace DJLibrary
                 if (digital == "No Match" && t.DigitalLevel != "none") return false;
             }
 
+            string cdx = _trackFilter.Cdx;
+            if (DiscPlaybackRule.Current.Enabled && !String.IsNullOrEmpty(cdx) && cdx != "All" &&
+                !String.Equals(t.CdxCompatibilityText, cdx, StringComparison.OrdinalIgnoreCase)) return false;
+
             string mix = _trackFilter.Mix;
             if (mix == "With Mix" && String.IsNullOrEmpty(t.Version)) return false;
             if (mix == "Without Mix" && !String.IsNullOrEmpty(t.Version)) return false;
@@ -1329,7 +1347,8 @@ namespace DJLibrary
             if (!String.IsNullOrEmpty(medium) && medium != "All" && !String.Equals(c.Medium, medium, StringComparison.OrdinalIgnoreCase)) return false;
 
             string cdx = _cdFilter.Cdx;
-            if (!String.IsNullOrEmpty(cdx) && cdx != "All" && !String.Equals(c.CdxCompatibilityText, cdx, StringComparison.OrdinalIgnoreCase)) return false;
+            if (DiscPlaybackRule.Current.Enabled && !String.IsNullOrEmpty(cdx) && cdx != "All" &&
+                !String.Equals(c.CdxCompatibilityText, cdx, StringComparison.OrdinalIgnoreCase)) return false;
 
             string digital = _cdFilter.Digital;
             if (!String.IsNullOrEmpty(digital) && digital != "All")
@@ -1373,7 +1392,7 @@ namespace DJLibrary
             if (!String.IsNullOrEmpty(state.Label) && state.Label != "All Labels") n++;
             if (!String.IsNullOrEmpty(state.Issues) && state.Issues != "All") n++;
             if (!String.IsNullOrEmpty(state.Medium) && state.Medium != "All") n++;
-            if (!String.IsNullOrEmpty(state.Cdx) && state.Cdx != "All") n++;
+            if (DiscPlaybackRule.Current.Enabled && !String.IsNullOrEmpty(state.Cdx) && state.Cdx != "All") n++;
             if (!String.IsNullOrEmpty(state.Mix) && state.Mix != "All") n++;
             return n;
         }
@@ -1402,7 +1421,8 @@ namespace DJLibrary
         internal string ValidateRuntimeUiContract()
     {
         if (Icon == null) throw new InvalidOperationException("UI-Produktionspfad: MainWindow-Icon fehlt.");
-        if (!GridRuntimeSupport.HasCdxColumn(_cdGrid)) throw new InvalidOperationException("UI-Produktionspfad: MainWindow-CD-Grid besitzt keine echte CDX-Spalte.");
+        if (!GridRuntimeSupport.HasCdxColumn(_cdGrid) || !GridRuntimeSupport.HasCdxColumn(_trackGrid))
+            throw new InvalidOperationException("UI production path: playback column missing from CD or track grid.");
         if (_cdGrid.RowStyle == null) throw new InvalidOperationException("UI-Produktionspfad: MainWindow-CD-Grid besitzt keine CDX-Zeilenmarkierung.");
         if (!GridRuntimeSupport.HasClipboardMenu(_cdGrid) || !GridRuntimeSupport.HasClipboardMenu(_trackGrid))
             throw new InvalidOperationException("UI-Produktionspfad: Clipboard-Wiring fehlt an MainWindow-Grids.");
@@ -1422,6 +1442,10 @@ namespace DJLibrary
         _cdFilter.Cdx = old;
         if (!acceptsNo || !rejectsYes) throw new InvalidOperationException("UI production path: CDX filter predicate is ineffective.");
         if (incompatible.CdxCompatibilityText != "No") throw new InvalidOperationException("UI production path: CDX No contains unexpected extra glyphs.");
+        TrackRow incompatibleTrack = _data.Tracks.FirstOrDefault(x => x.DiscId == incompatible.DiscId);
+        if (incompatibleTrack == null || incompatibleTrack.CdxCompatibilityText != "No" ||
+            incompatibleTrack.DiscToc != incompatible.Toc)
+            throw new InvalidOperationException("UI production path: tracks did not inherit their parent disc playback limit.");
 
         return "MainWindow: CDX-Spalte + disc-spezifische Rotmarkierung + Filter Yes/No/Unknown + explizites Clipboard + Icon";
     }
@@ -1431,6 +1455,24 @@ namespace DJLibrary
             FilterState copy = new FilterState();
             CopyFilter(source, copy);
             return copy;
+        }
+
+        private void RefreshPlaybackRuleViews()
+        {
+            // Profile setting already saved atomically by the rule dialog.
+            _trackFilter.Cdx = "";
+            _cdFilter.Cdx = "";
+            foreach (DataGrid grid in new[] { _trackGrid, _cdGrid })
+            {
+                DataGridColumn column = grid.Columns.FirstOrDefault(x => x.SortMemberPath == "CdxCompatibilitySortKey");
+                if (column != null) column.Visibility = DiscPlaybackRule.Current.Enabled ? Visibility.Visible : Visibility.Collapsed;
+            }
+            PopulateFilterOptions();
+            _trackView.Refresh();
+            _cdView.Refresh();
+            _trackGrid.Items.Refresh();
+            _cdGrid.Items.Refresh();
+            RefreshCurrentView();
         }
 
         private void ConfigureColumns()

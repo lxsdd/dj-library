@@ -105,6 +105,36 @@ namespace DJLibrary
             return layout.Replace('_', ' ');
         }
 
+        // Shared baseline contract: text and the interactive checkbox glyph
+        // must occupy the same vertically centered row across WPF dialogs.
+        public static CheckBox AlignedCheckBox(string caption)
+        {
+            CheckBox cb = new CheckBox();
+            cb.Content = new TextBlock {
+                Text = caption ?? "",
+                VerticalAlignment = VerticalAlignment.Center,
+                TextAlignment = TextAlignment.Left,
+                TextWrapping = TextWrapping.NoWrap
+            };
+            cb.MinHeight = 26;
+            cb.Padding = new Thickness(0);
+            cb.Margin = new Thickness(0);
+            cb.VerticalAlignment = VerticalAlignment.Center;
+            cb.VerticalContentAlignment = VerticalAlignment.Center;
+            cb.HorizontalAlignment = HorizontalAlignment.Stretch;
+            return cb;
+        }
+
+        public static bool IsAlignedCheckBox(CheckBox cb)
+        {
+            TextBlock text = cb == null ? null : cb.Content as TextBlock;
+            return cb != null && text != null &&
+                cb.VerticalAlignment == VerticalAlignment.Center &&
+                cb.VerticalContentAlignment == VerticalAlignment.Center &&
+                text.VerticalAlignment == VerticalAlignment.Center &&
+                cb.Padding.Top == 0 && cb.Padding.Bottom == 0;
+        }
+
         public static TextBlock Header(string text, string toolTip)
         {
             TextBlock tb = new TextBlock();
@@ -220,7 +250,7 @@ namespace DJLibrary
             t.FontWeight = FontWeights.SemiBold;
             t.TextWrapping = TextWrapping.Wrap;
             t.Margin = new Thickness(0, 4, 10, 4);
-            t.VerticalAlignment = VerticalAlignment.Top;
+            t.VerticalAlignment = VerticalAlignment.Center;
             if (!String.IsNullOrEmpty(toolTip)) t.ToolTip = toolTip;
             return t;
         }
@@ -231,7 +261,7 @@ namespace DJLibrary
             t.Text = String.IsNullOrEmpty(text) ? "—" : text;
             t.TextWrapping = TextWrapping.Wrap;
             t.Margin = new Thickness(0, 4, 18, 4);
-            t.VerticalAlignment = VerticalAlignment.Top;
+            t.VerticalAlignment = VerticalAlignment.Center;
             if (!String.IsNullOrEmpty(toolTip)) t.ToolTip = toolTip;
             return t;
         }
@@ -246,7 +276,7 @@ namespace DJLibrary
             t.Padding = new Thickness(0);
             t.TextWrapping = TextWrapping.Wrap;
             t.Margin = new Thickness(0, 4, 18, 4);
-            t.VerticalAlignment = VerticalAlignment.Top;
+            t.VerticalAlignment = VerticalAlignment.Center;
             t.Cursor = Cursors.IBeam;
             if (!String.IsNullOrEmpty(toolTip)) t.ToolTip = toolTip;
             return t;
@@ -285,7 +315,8 @@ namespace DJLibrary
             v.IsChecked = value;
             v.IsHitTestVisible = false;
             v.Focusable = false;
-            v.VerticalAlignment = VerticalAlignment.Top;
+            v.VerticalAlignment = VerticalAlignment.Center;
+            v.VerticalContentAlignment = VerticalAlignment.Center;
             v.Margin = new Thickness(0, 5, 18, 4);
             if (!String.IsNullOrEmpty(toolTip)) v.ToolTip = toolTip;
             Grid.SetRow(l, row);

@@ -79,6 +79,7 @@ namespace DJLibrary
                 List<TrackRow> list; if(!TracksByDisc.TryGetValue(t.DiscId,out list)) { list=new List<TrackRow>(); TracksByDisc[t.DiscId]=list; } list.Add(t);
             }
 
+            BindTracksToPhysicalDiscs();
             if(pristine && !String.IsNullOrWhiteSpace(referenceMatchesPath) && File.Exists(referenceMatchesPath)) LoadMatches(referenceMatchesPath);
             if(_activeLiveItems!=null) ApplyLiveDigitalItems(new List<DigitalItem>(_activeLiveItems));
         }

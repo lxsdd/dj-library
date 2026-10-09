@@ -92,7 +92,9 @@ namespace DJLibrary
             _albumArtist=boxes[0]; _album=boxes[1]; _year=boxes[2]; _label=boxes[3]; _catalogNumber=boxes[4]; _country=boxes[5];
             body.Children.Add(anchors);
 
-            _remember = new CheckBox { Content = "Remember source selection as default for future Audio CD matching", Margin = new Thickness(0, 10, 0, 0), ToolTip="Remember only which additional sources are enabled by default. Editable search-anchor values are not stored as global defaults." };
+            _remember = UiHelpers.AlignedCheckBox("Remember source selection as default for future Audio CD matching");
+            _remember.Margin = new Thickness(0, 10, 0, 0);
+            _remember.ToolTip = "Remember only which additional sources are enabled by default. Editable search-anchor values are not stored as global defaults.";
             body.Children.Add(_remember);
 
             start.Click += delegate
@@ -126,7 +128,11 @@ namespace DJLibrary
 
         private static CheckBox Choice(string text, bool value, string tip)
         {
-            return new CheckBox { Content = text, IsChecked = value, ToolTip = tip, Margin = new Thickness(0, 3, 0, 3) };
+            CheckBox checkbox = UiHelpers.AlignedCheckBox(text);
+            checkbox.IsChecked = value;
+            checkbox.ToolTip = tip;
+            checkbox.Margin = new Thickness(0, 3, 0, 3);
+            return checkbox;
         }
 
         public static bool Choose(Window owner, CdMetadataFetchOptions defaults, out CdMetadataSourcePickerResult result)

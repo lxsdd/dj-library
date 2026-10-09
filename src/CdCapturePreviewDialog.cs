@@ -112,19 +112,22 @@ namespace DJLibrary
             {
                 _useExisting = new RadioButton
                 {
-                    Content = "Use existing disc (no duplicate): " + _duplicate.DisplayText,
+                    Content = new TextBlock { Text = "Use existing disc (no duplicate): " + _duplicate.DisplayText, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap },
+                    VerticalAlignment = VerticalAlignment.Center,
+                    VerticalContentAlignment = VerticalAlignment.Center,
+                    MinHeight = 27,
                     IsChecked = true,
                     Margin = new Thickness(0, 0, 0, 7),
                     ToolTip = "Use the already cataloged disc identified by exact physical TOC. No duplicate disc is created and metadata matching remains comparison-only unless explicitly reviewed/applied."
                 };
                 dest.Children.Add(_useExisting);
             }
-            _newRelease = new RadioButton { Content = "Create New Release", IsChecked = _duplicate == null, Margin = new Thickness(0, 0, 0, 7), ToolTip="Create a new catalog release from the physical disc plus the reviewed metadata result." };
-            _existingRelease = new RadioButton { Content = "Add Disc to Existing Release", Margin = new Thickness(0, 0, 0, 6), ToolTip="Add this physical disc to an existing catalog release. The selected release is not silently overwritten by metadata matching." };
+            _newRelease = new RadioButton { Content = new TextBlock { Text = "Create New Release", VerticalAlignment = VerticalAlignment.Center }, VerticalAlignment=VerticalAlignment.Center, VerticalContentAlignment=VerticalAlignment.Center, MinHeight=27, IsChecked = _duplicate == null, Margin = new Thickness(0, 0, 0, 7), ToolTip="Create a new catalog release from the physical disc plus the reviewed metadata result." };
+            _existingRelease = new RadioButton { Content = new TextBlock { Text = "Add Disc to Existing Release", VerticalAlignment=VerticalAlignment.Center }, VerticalAlignment=VerticalAlignment.Center, VerticalContentAlignment=VerticalAlignment.Center, MinHeight=27, Margin = new Thickness(0, 0, 0, 6), ToolTip="Add this physical disc to an existing catalog release. The selected release is not silently overwritten by metadata matching." };
             dest.Children.Add(_newRelease);
             dest.Children.Add(_existingRelease);
 
-            _releaseCombo = new ComboBox { MinWidth = 420, DisplayMemberPath = "DisplayText", IsEnabled = false, Margin = new Thickness(22, 0, 0, 10), ToolTip="Target catalog release used only when Add Disc to Existing Release is selected." };
+            _releaseCombo = new ComboBox { MinWidth = 420, Height=27, VerticalAlignment=VerticalAlignment.Center, VerticalContentAlignment=VerticalAlignment.Center, DisplayMemberPath = "DisplayText", IsEnabled = false, Margin = new Thickness(22, 0, 0, 10), ToolTip="Target catalog release used only when Add Disc to Existing Release is selected." };
             ToolTipService.SetShowOnDisabled(_releaseCombo,true);
             foreach (CatalogRelease release in releases ?? new List<CatalogRelease>()) _releaseCombo.Items.Add(release);
             if (suggested != null)

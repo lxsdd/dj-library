@@ -47,6 +47,9 @@ namespace DJLibrary
         public int DiscTrackCount { get; set; }
         public double DiscDurationSeconds { get; set; }
         public string DiscDurationSource { get; set; }
+        // Inherited from the actual containing disc, never estimated from the track.
+        public string DiscToc { get; set; }
+        public bool DiscTocComplete { get; set; }
         public string DiscLayout { get; set; }
         public string IssueCode { get; set; }
         public string IssueDetail { get; set; }
@@ -56,6 +59,12 @@ namespace DJLibrary
         public int LikelyCount { get; set; }
         public int CandidateCount { get; set; }
         public string SearchText { get; set; }
+
+        public CdxCompatibilityState CdxCompatibilityState { get { return DiscPlaybackRule.Classify(DiscToc, DiscTocComplete); } }
+        public string CdxCompatibilityText { get { return DiscPlaybackRule.Text(CdxCompatibilityState); } }
+        public string CdxCompatibilityCode { get { return DiscPlaybackRule.Code(CdxCompatibilityState, true); } }
+        public int CdxCompatibilitySortKey { get { return CdxCompatibility.SortKey(CdxCompatibilityState); } }
+        public string CdxCompatibilityToolTip { get { return DiscPlaybackRule.Explanation(CdxCompatibilityState); } }
 
         public string DurationText { get { return UiHelpers.FormatDuration(DurationSeconds); } }
         public string BpmText { get { return Bpm > 0 ? Bpm.ToString("0.##") : ""; } }
@@ -156,11 +165,11 @@ namespace DJLibrary
         public string IssueText { get { return String.IsNullOrEmpty(IssueCode) ? "" : "Auffällig"; } }
         public string GenreSourceText { get { return GenreSource == "digital_consensus" ? "Digitaler Track-Konsens" : "Legacy"; } }
         public bool GenreProjected { get { return GenreSource == "digital_consensus"; } }
-        public CdxCompatibilityState CdxCompatibilityState { get { return CdxCompatibility.Classify(Toc, TocComplete); } }
-        public string CdxCompatibilityText { get { return CdxCompatibility.Text(CdxCompatibilityState); } }
-        public string CdxCompatibilityCode { get { return CdxCompatibility.Code(CdxCompatibilityState); } }
+        public CdxCompatibilityState CdxCompatibilityState { get { return DiscPlaybackRule.Classify(Toc, TocComplete); } }
+        public string CdxCompatibilityText { get { return DiscPlaybackRule.Text(CdxCompatibilityState); } }
+        public string CdxCompatibilityCode { get { return DiscPlaybackRule.Code(CdxCompatibilityState, false); } }
         public int CdxCompatibilitySortKey { get { return CdxCompatibility.SortKey(CdxCompatibilityState); } }
-        public string CdxCompatibilityToolTip { get { return CdxCompatibility.ToolTip(CdxCompatibilityState); } }
+        public string CdxCompatibilityToolTip { get { return DiscPlaybackRule.Explanation(CdxCompatibilityState); } }
     }
 
     public sealed class MatchRow

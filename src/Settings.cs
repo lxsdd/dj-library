@@ -29,6 +29,26 @@ namespace DJLibrary
         public CdMetadataFetchOptions CdMetadataDefaults = new CdMetadataFetchOptions();
         public List<NamedGridLayout> GridLayouts = new List<NamedGridLayout>();
         public List<NamedWindowGeometry> WindowGeometries = new List<NamedWindowGeometry>();
+        // Independent of the immutable physical CD metadata and ID3 tags.
+        public DiscPlaybackRuleSettings DiscPlayback = new DiscPlaybackRuleSettings();
+    }
+
+    public sealed class DiscPlaybackRuleSettings
+    {
+        // Enabled by default to preserve existing v0.4 CDX layouts on upgrade.
+        // Users without a CDX can switch this off once, without altering the catalog.
+        public bool Enabled = true;
+        public string DeviceLabel = "Numark CDX";
+        public int LimitFrames = CdxCompatibility.IncompatibleFromFrames;
+        public bool Inclusive = true;
+        public bool MarkCds = true;
+        public bool MarkTracks = true;
+        public string WarningColor = "Red";
+
+        public DiscPlaybackRuleSettings Clone()
+        {
+            return (DiscPlaybackRuleSettings)MemberwiseClone();
+        }
     }
 
     public sealed class ColumnSetting

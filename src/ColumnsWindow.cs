@@ -96,18 +96,37 @@ namespace DJLibrary
                 TextBlock header = c.Header as TextBlock;
                 if (header != null) label = header.Text;
 
-                CheckBox cb = new CheckBox();
-                cb.Content = label;
+                CheckBox cb = UiHelpers.AlignedCheckBox(label);
                 cb.IsChecked = c.Visibility == Visibility.Visible;
                 cb.Tag = c;
-                cb.Padding = new Thickness(4);
                 cb.ToolTip = header != null ? header.ToolTip : null;
 
                 ListBoxItem item = new ListBoxItem();
+                item.Padding = new Thickness(4, 0, 4, 0);
+                item.MinHeight = 30;
+                item.VerticalContentAlignment = VerticalAlignment.Center;
                 item.Content = cb;
                 item.Tag = c;
                 _list.Items.Add(item);
             }
+        }
+
+        internal static string ValidateAlignmentContract()
+        {
+            DataGrid grid = new DataGrid();
+            grid.Columns.Add(new DataGridTextColumn {
+                Header = UiHelpers.Header("Album / CD", "Sample"),
+                SortMemberPath = "Album",
+                Visibility = Visibility.Visible
+            });
+            ColumnsWindow dialog = new ColumnsWindow(null, grid, "Columns layout test");
+            ListBoxItem item = dialog._list.Items[0] as ListBoxItem;
+            CheckBox checkbox = item == null ? null : item.Content as CheckBox;
+            if (item == null || item.MinHeight < 28 ||
+                item.VerticalContentAlignment != VerticalAlignment.Center ||
+                !UiHelpers.IsAlignedCheckBox(checkbox))
+                throw new InvalidOperationException("Configure Columns checkbox and caption have mismatched vertical alignment.");
+            return "Configure Columns checkbox + caption share a centered row baseline";
         }
 
         private void Move(int delta)
