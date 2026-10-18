@@ -12,13 +12,6 @@ on:
       - 'tools/**'
   pull_request:
     branches: [ main ]
-    paths:
-      - 'src/**'
-      - 'BuildOnly.cmd'
-      - 'SelfTest.cmd'
-      - 'ci/payload/**'
-      - 'tools/**'
-      - '.github/workflows/**'
   workflow_call:
   workflow_dispatch:
 
