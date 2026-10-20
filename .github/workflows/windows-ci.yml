@@ -30,6 +30,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Assert all public DJ Library artifact/release gates stay closed
+        shell: pwsh
+        run: python scripts/verify-public-artifact-hold.py
+
       - name: Checkout shared Metadata Normalizer
         uses: actions/checkout@v7
         with:
