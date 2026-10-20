@@ -298,7 +298,7 @@ jobs:
           Get-Content CI-VALIDATION.txt
 
       - name: Upload qualified artifact
-        if: steps.tier.outputs.full == 'true'
+        if: false # Source-only CI pending redistribution clearance
         uses: actions/upload-artifact@v7
         with:
           name: DJLibrary-qualified-${{ github.sha }}
@@ -327,7 +327,7 @@ jobs:
           }
 
       - name: Upload failure diagnostics
-        if: failure()
+        if: false # No public diagnostic ZIPs
         uses: actions/upload-artifact@v7
         with:
           name: DJLibrary-CI-failure-${{ github.sha }}
