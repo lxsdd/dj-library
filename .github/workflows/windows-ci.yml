@@ -30,6 +30,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Assert all public DJ Library artifact/release gates stay closed
+        shell: pwsh
+        run: python scripts/verify-public-artifact-hold.py
+
       - name: Checkout shared Metadata Normalizer
         uses: actions/checkout@v7
         with:
@@ -298,7 +302,7 @@ jobs:
           Get-Content CI-VALIDATION.txt
 
       - name: Upload qualified artifact
-        if: steps.tier.outputs.full == 'true'
+        if: false # Source-only CI pending redistribution clearance
         uses: actions/upload-artifact@v7
         with:
           name: DJLibrary-qualified-${{ github.sha }}
@@ -327,7 +331,7 @@ jobs:
           }
 
       - name: Upload failure diagnostics
-        if: failure()
+        if: false # No public diagnostic ZIPs
         uses: actions/upload-artifact@v7
         with:
           name: DJLibrary-CI-failure-${{ github.sha }}
